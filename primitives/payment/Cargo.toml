@@ -1,0 +1,23 @@
+[package]
+name = "vibly-primitives-payment"
+version = "0.1.0"
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+codec = { features = ["derive"], workspace = true }
+frame = { workspace = true, features = ["runtime"], default-features = false }
+scale-info = { features = ["derive"], workspace = true }
+vibly-primitives-common.workspace = true
+vibly-primitives-identity.workspace = true
+
+[features]
+default = ["std"]
+std = ["codec/std", "frame/std", "scale-info/std", "vibly-primitives-common/std", "vibly-primitives-identity/std"]

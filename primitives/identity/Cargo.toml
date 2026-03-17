@@ -1,0 +1,29 @@
+[package]
+name = "vibly-primitives-identity"
+version = "0.1.0"
+license.workspace = true
+authors.workspace = true
+homepage.workspace = true
+repository.workspace = true
+edition.workspace = true
+publish = false
+
+[lints]
+workspace = true
+
+[dependencies]
+codec = { features = ["derive"], workspace = true }
+frame = { workspace = true, features = ["runtime"], default-features = false }
+scale-info = { features = ["derive"], workspace = true }
+sp-runtime = { workspace = true }
+vibly-primitives-common.workspace = true
+
+[features]
+default = ["std"]
+std = [
+	"codec/std",
+	"frame/std",
+	"scale-info/std",
+	"sp-runtime/std",
+	"vibly-primitives-common/std",
+]

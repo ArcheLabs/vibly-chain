@@ -1,0 +1,4 @@
+[build]
+# rustc 1.94.0 can ICE while rendering `mismatched_lifetime_syntaxes`
+# warnings from transitive dependencies during host and WASM runtime builds.
+rustflags = ["-A", "mismatched_lifetime_syntaxes"]
