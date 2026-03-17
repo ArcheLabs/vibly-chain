@@ -64,7 +64,7 @@ docify = {version = "0.4.1"}
 frame = {version = "0.14.0", default-features = false, package = "polkadot-sdk-frame"}
 futures = {version = "0.3.32"}
 hex-literal = {version = "1.1.0", default-features = false}
-jsonrpsee = {version = "0.26.0"}
+jsonrpsee = {version = "0.24.10"}
 log = {version = "0.4.22", default-features = false}
 pallet-identity-core = {path = "./pallets/identity-core", default-features = false}
 pallet-payment-intent = {path = "./pallets/payment-intent", default-features = false}
