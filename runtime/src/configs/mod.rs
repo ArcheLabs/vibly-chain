@@ -61,9 +61,9 @@ use xcm::latest::prelude::{AssetId, BodyId};
 use super::{
     weights::{BlockExecutionWeight, ExtrinsicBaseWeight, RocksDbWeight},
     AccountId, Aura, Balance, Balances, Block, BlockNumber, CollatorSelection, ConsensusHook, Hash,
-    IdentityCore, MessageQueue, Nonce, PalletInfo, ParachainSystem, PaymentIntent, Runtime,
+    IdentityCore, MessageQueue, Nonce, PalletInfo, ParachainSystem, Runtime,
     RuntimeCall, RuntimeEvent, RuntimeFreezeReason, RuntimeHoldReason, RuntimeOrigin, RuntimeTask,
-    Session, SessionKeys, System, System, Timestamp, WeightToFee, WeightToFee, XcmpQueue,
+    Session, SessionKeys, System, Timestamp, WeightToFee, XcmpQueue,
     AVERAGE_ON_INITIALIZE_RATIO, CENTS, EXISTENTIAL_DEPOSIT, HOURS, MAXIMUM_BLOCK_WEIGHT,
     MICRO_UNIT, NORMAL_DISPATCH_RATIO, SLOT_DURATION, VERSION,
 };
@@ -99,12 +99,6 @@ parameter_types! {
     pub const SS58Prefix: u16 = 42;
 }
 
-/// All migrations of the runtime, aside from the ones declared in the pallets.
-///
-/// This can be a tuple of types, each implementing `OnRuntimeUpgrade`.
-#[allow(unused_parens)]
-type SingleBlockMigrations = ();
-
 #[derive_impl(frame_system::config_preludes::ParaChainDefaultConfig)]
 impl frame_system::Config for Runtime {
     type AccountId = AccountId;
@@ -120,40 +114,6 @@ impl frame_system::Config for Runtime {
     type SS58Prefix = SS58Prefix;
     type OnSetCode = cumulus_pallet_parachain_system::ParachainSetCode<Self>;
     type MaxConsumers = frame_support::traits::ConstU32<16>;
-
-    type RuntimeEvent;
-
-    type BaseCallFilter;
-
-    type RuntimeOrigin;
-
-    type RuntimeCall;
-
-    type RuntimeTask;
-
-    type Hashing;
-
-    type Lookup;
-
-    type PalletInfo;
-
-    type OnNewAccount;
-
-    type OnKilledAccount;
-
-    type SystemWeightInfo;
-
-    type ExtensionsWeightInfo;
-
-    type SingleBlockMigrations;
-
-    type MultiBlockMigrator;
-
-    type PreInherents;
-
-    type PostInherents;
-
-    type PostTransactions;
 }
 
 /// Configure the palelt weight reclaim tx.
@@ -236,8 +196,7 @@ impl cumulus_pallet_parachain_system::Config for Runtime {
     type ReservedXcmpWeight = ReservedXcmpWeight;
     type CheckAssociatedRelayNumber = RelayNumberMonotonicallyIncreases;
     type ConsensusHook = ConsensusHook;
-
-    type RelayParentOffset;
+    type RelayParentOffset = ConstU32<0>;
 }
 
 impl parachain_info::Config for Runtime {}
@@ -395,7 +354,6 @@ impl Get<u32> for PaymentMaxNamespaceLen {
 }
 
 impl pallet_identity_core::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = pallet_identity_core::weights::SubstrateWeight<Runtime>;
     type TimeProvider = Timestamp;
     type MaxCidLen = IdentityMaxCidLen;
@@ -404,7 +362,6 @@ impl pallet_identity_core::Config for Runtime {
 }
 
 impl pallet_payment_intent::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = pallet_payment_intent::weights::SubstrateWeight<Runtime>;
     type TimeProvider = Timestamp;
     type IdentityProvider = IdentityCore;

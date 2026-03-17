@@ -48,7 +48,6 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
         type WeightInfo: crate::weights::WeightInfo;
         type TimeProvider: Time<Moment = u64>;
         type IdentityProvider: IdentityAccess<Self::AccountId>;
