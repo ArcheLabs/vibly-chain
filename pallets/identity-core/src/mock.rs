@@ -72,7 +72,6 @@ impl pallet_timestamp::Config for Test {
 }
 
 impl crate::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = ();
     type TimeProvider = Timestamp;
     type MaxCidLen = IdentityCoreMaxCidLen;

@@ -34,6 +34,32 @@ cargo build --release -p parachain-template-node
 
 Use `scripts/dev/build.sh` and `scripts/dev/zombienet-local.sh` for a local relay chain + two collator setup.
 
+Prerequisites:
+
+- Rust target: `rustup target add wasm32-unknown-unknown`
+- Zombienet CLI: `npm install -g @zombienet/cli`
+- Relay chain binaries: `zombienet setup polkadot`
+
+Recommended verification:
+
+```bash
+zombienet version
+polkadot --version
+```
+
+Typical flow:
+
+```bash
+./scripts/dev/build.sh
+./scripts/dev/zombienet-local.sh
+```
+
+Notes:
+
+- `scripts/dev/zombienet-local.sh` uses the native provider.
+- The script changes into the repository root before spawning the network, so it can be run from any working directory.
+- If `polkadot` is not on `PATH`, add the directory used by `zombienet setup polkadot` to your shell `PATH`.
+
 ## Paseo
 
 Use `scripts/paseo/build-artifacts.sh` to build release artifacts and `scripts/paseo/collator.sh` as a collator launch template. Registration and upgrade notes live in `scripts/paseo/README.md`.
