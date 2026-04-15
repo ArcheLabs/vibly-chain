@@ -1,4 +1,10 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+//! Core identity pallet for vibly-chain.
+//!
+//! This pallet stores root identities, delegated keys, active content pointers, and
+//! external transport bindings. Owner accounts have full authority. Optional recovery
+//! accounts can perform owner/recovery lifecycle actions, while delegated keys are
+//! constrained by capability bits.
 
 pub use pallet::*;
 
@@ -39,20 +45,30 @@ pub mod pallet {
 
     #[derive(Clone, Copy, Eq, PartialEq)]
     enum AccessScope {
+        /// Owner or recovery actions, such as owner rotation and freezing.
         OwnerOrRecovery,
+        /// Active content pointer management.
         PointerManager,
+        /// External transport binding management.
         TransportManager,
+        /// Payment intent management for cross-pallet authorization.
         PaymentManager,
     }
 
     #[pallet::config]
+    /// Runtime configuration for identity storage and authorization.
     pub trait Config: frame_system::Config {
+        /// Weight provider for dispatchable calls.
         type WeightInfo: crate::weights::WeightInfo;
+        /// Timestamp provider returning milliseconds.
         type TimeProvider: Time<Moment = u64>;
+        /// Maximum encoded length for content CIDs.
         #[pallet::constant]
         type MaxCidLen: Get<u32> + core::fmt::Debug + Clone + Eq + PartialEq + TypeInfo;
+        /// Maximum encoded length for content URIs.
         #[pallet::constant]
         type MaxUriLen: Get<u32> + core::fmt::Debug + Clone + Eq + PartialEq + TypeInfo;
+        /// Maximum encoded length for external transport account locators.
         #[pallet::constant]
         type MaxTransportAccountLen: Get<u32> + core::fmt::Debug + Clone + Eq + PartialEq + TypeInfo;
     }
@@ -61,113 +77,148 @@ pub mod pallet {
     pub struct Pallet<T>(_);
 
     #[pallet::storage]
+    /// Root identity records keyed by generated identity id.
     pub type Identities<T: Config> = StorageMap<_, Blake2_128Concat, IdentityId, RootIdentityOf<T>>;
     #[pallet::storage]
+    /// Delegated key records keyed by generated key id.
     pub type AuthorizedKeys<T: Config> =
         StorageMap<_, Blake2_128Concat, KeyId, AuthorizedKeyRecordOf<T>>;
     #[pallet::storage]
+    /// Reverse lookup from `(identity_id, account)` to delegated key id.
     pub type AuthorizedKeyIdByAccount<T: Config> =
         StorageMap<_, Blake2_128Concat, (IdentityId, T::AccountId), KeyId>;
     #[pallet::storage]
+    /// External transport binding records keyed by generated binding id.
     pub type TransportBindings<T: Config> =
         StorageMap<_, Blake2_128Concat, TransportBindingId, TransportBindingOf<T>>;
     #[pallet::storage]
+    /// Uniqueness index for `(identity_id, transport, transport_account)`.
     pub type TransportBindingByIdentityAndLocator<T: Config> =
         StorageMap<_, Blake2_128Concat, Hash256, TransportBindingId>;
     #[pallet::storage]
+    /// Monotonic sequence used to derive identity ids.
     pub type NextIdentitySequence<T> = StorageValue<_, u64, ValueQuery>;
     #[pallet::storage]
+    /// Monotonic sequence used to derive transport binding ids.
     pub type NextTransportSequence<T> = StorageValue<_, u64, ValueQuery>;
 
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
+    /// Identity lifecycle and pointer events.
     pub enum Event<T: Config> {
+        /// A new root identity was registered.
         IdentityRegistered {
             identity_id: IdentityId,
             owner: T::AccountId,
         },
+        /// The owner account was rotated.
         OwnerKeyRotated {
             identity_id: IdentityId,
             old_owner: T::AccountId,
             new_owner: T::AccountId,
         },
-        RecoveryKeySet {
-            identity_id: IdentityId,
-        },
+        /// The optional recovery account was changed.
+        RecoveryKeySet { identity_id: IdentityId },
+        /// A delegated key was added.
         IdentityKeyAdded {
             identity_id: IdentityId,
             key_id: KeyId,
             purpose: KeyPurpose,
         },
+        /// A delegated key was removed.
         IdentityKeyRevoked {
             identity_id: IdentityId,
             key_id: KeyId,
         },
-        ActiveProfileSet {
-            identity_id: IdentityId,
-        },
-        ActiveAgentRegistrySet {
-            identity_id: IdentityId,
-        },
-        ActiveAuthRegistrySet {
-            identity_id: IdentityId,
-        },
-        ActiveRelationPolicySet {
-            identity_id: IdentityId,
-        },
+        /// The active profile pointer changed.
+        ActiveProfileSet { identity_id: IdentityId },
+        /// The active agent registry pointer changed.
+        ActiveAgentRegistrySet { identity_id: IdentityId },
+        /// The active authorization registry pointer changed.
+        ActiveAuthRegistrySet { identity_id: IdentityId },
+        /// The active relation policy pointer changed.
+        ActiveRelationPolicySet { identity_id: IdentityId },
+        /// A transport binding was created in pending state.
         TransportBound {
             identity_id: IdentityId,
             binding_id: TransportBindingId,
             transport: TransportKind,
         },
+        /// A pending transport binding was verified.
         TransportVerified {
             identity_id: IdentityId,
             binding_id: TransportBindingId,
         },
+        /// A transport binding was revoked.
         TransportRevoked {
             identity_id: IdentityId,
             binding_id: TransportBindingId,
         },
-        IdentityFrozen {
-            identity_id: IdentityId,
-        },
-        IdentityUnfrozen {
-            identity_id: IdentityId,
-        },
-        IdentityDisabled {
-            identity_id: IdentityId,
-        },
+        /// An identity was frozen.
+        IdentityFrozen { identity_id: IdentityId },
+        /// A frozen identity was reactivated.
+        IdentityUnfrozen { identity_id: IdentityId },
+        /// An identity was permanently disabled.
+        IdentityDisabled { identity_id: IdentityId },
     }
 
     #[pallet::error]
+    /// Identity pallet errors.
     pub enum Error<T> {
+        /// The requested identity id is already in use.
         IdentityAlreadyExists,
+        /// No identity exists for the requested id.
         IdentityNotFound,
+        /// The identity or binding is not in a valid state for the operation.
         InvalidState,
+        /// The identity is already frozen.
         AlreadyFrozen,
+        /// The identity is not frozen.
         NotFrozen,
+        /// The identity is already disabled.
         AlreadyDisabled,
+        /// Caller does not have the required owner, recovery, or delegated capability.
         Unauthorized,
+        /// Owner-only key material was required.
         OwnerKeyRequired,
+        /// No recovery account is configured.
         RecoveryNotConfigured,
+        /// Recovery account cannot perform this operation.
         RecoveryNotAllowed,
+        /// A delegated key already exists for the account.
         KeyAlreadyExists,
+        /// The requested delegated key does not exist.
         KeyNotFound,
+        /// The key is structurally invalid for this identity.
         KeyInvalid,
+        /// The delegated key has expired.
         KeyExpired,
+        /// The delegated key has been revoked.
         KeyRevoked,
+        /// A content pointer is invalid.
         PointerInvalid,
+        /// This transport account is already bound for the identity.
         TransportBindingAlreadyExists,
+        /// The requested transport binding does not exist.
         TransportBindingNotFound,
+        /// Transport verification proof failed validation.
         TransportVerificationFailed,
+        /// Transport kind or account is not allowed.
         TransportNotAllowed,
+        /// The supplied nonce is invalid.
         NonceInvalid,
+        /// A sequence or counter overflowed.
         Overflow,
+        /// Generic invalid input.
         InvalidInput,
     }
 
     #[pallet::call]
     impl<T: Config> Pallet<T> {
+        /// Register a new root identity owned by the signed origin.
+        ///
+        /// The identity id is derived from a pallet-local sequence. Optional active pointers can
+        /// be supplied at registration time, and all later mutations bump the identity nonce.
         #[pallet::call_index(0)]
         #[pallet::weight(T::WeightInfo::register_identity())]
         pub fn register_identity(
@@ -201,6 +252,10 @@ pub mod pallet {
             Ok(())
         }
 
+        /// Rotate the owner account for an active or frozen identity.
+        ///
+        /// The current owner or configured recovery account may call this. Delegated keys cannot
+        /// rotate the owner.
         #[pallet::call_index(1)]
         #[pallet::weight(T::WeightInfo::rotate_owner_key())]
         pub fn rotate_owner_key(
@@ -227,6 +282,10 @@ pub mod pallet {
             })
         }
 
+        /// Set or clear the recovery account.
+        ///
+        /// Recovery is intentionally limited to owner/recovery lifecycle actions and cannot manage
+        /// pointers, transports, or payment authority.
         #[pallet::call_index(2)]
         #[pallet::weight(T::WeightInfo::set_recovery_key())]
         pub fn set_recovery_key(
@@ -248,6 +307,10 @@ pub mod pallet {
             })
         }
 
+        /// Add a delegated key with explicit capability bits.
+        ///
+        /// Owner and recovery purposes are reserved for the root identity fields and cannot be
+        /// added as delegated keys. The key id is derived from `(identity_id, account)`.
         #[pallet::call_index(3)]
         #[pallet::weight(T::WeightInfo::add_key())]
         pub fn add_key(
@@ -303,6 +366,10 @@ pub mod pallet {
             })
         }
 
+        /// Revoke a delegated key by removing its authorization record.
+        ///
+        /// The caller must be the owner or hold pointer-management authority. Removing the key also
+        /// removes the account reverse lookup.
         #[pallet::call_index(4)]
         #[pallet::weight(T::WeightInfo::revoke_key())]
         pub fn revoke_key(
@@ -330,6 +397,7 @@ pub mod pallet {
             })
         }
 
+        /// Set or clear the active profile content pointer.
         #[pallet::call_index(5)]
         #[pallet::weight(T::WeightInfo::set_active_profile())]
         pub fn set_active_profile(
@@ -346,6 +414,7 @@ pub mod pallet {
             )
         }
 
+        /// Set or clear the active agent registry content pointer.
         #[pallet::call_index(6)]
         #[pallet::weight(T::WeightInfo::set_active_agent_registry())]
         pub fn set_active_agent_registry(
@@ -362,6 +431,7 @@ pub mod pallet {
             )
         }
 
+        /// Set or clear the active authorization registry content pointer.
         #[pallet::call_index(7)]
         #[pallet::weight(T::WeightInfo::set_active_auth_registry())]
         pub fn set_active_auth_registry(
@@ -378,6 +448,7 @@ pub mod pallet {
             )
         }
 
+        /// Set or clear the active relation policy content pointer.
         #[pallet::call_index(8)]
         #[pallet::weight(T::WeightInfo::set_active_relation_policy())]
         pub fn set_active_relation_policy(
@@ -394,6 +465,10 @@ pub mod pallet {
             )
         }
 
+        /// Create a pending external transport binding for an identity.
+        ///
+        /// Bindings are unique per `(identity_id, transport, account)` locator. A separate
+        /// verification step lets owner or recovery confirm the binding proof.
         #[pallet::call_index(9)]
         #[pallet::weight(T::WeightInfo::bind_transport())]
         pub fn bind_transport(
@@ -441,6 +516,10 @@ pub mod pallet {
             })
         }
 
+        /// Verify a pending transport binding.
+        ///
+        /// Only the owner or recovery account may verify, because verification asserts control over
+        /// the identity rather than over delegated transport-management authority.
         #[pallet::call_index(10)]
         #[pallet::weight(T::WeightInfo::verify_transport())]
         pub fn verify_transport(
@@ -479,6 +558,9 @@ pub mod pallet {
             })
         }
 
+        /// Revoke an existing transport binding.
+        ///
+        /// Revocation keeps the binding record for auditability and marks it as no longer valid.
         #[pallet::call_index(11)]
         #[pallet::weight(T::WeightInfo::revoke_transport())]
         pub fn revoke_transport(
@@ -515,6 +597,10 @@ pub mod pallet {
             })
         }
 
+        /// Freeze an identity.
+        ///
+        /// Frozen identities reject delegated pointer, transport, and payment-management actions,
+        /// but owner/recovery can still unfreeze, rotate owner, or disable.
         #[pallet::call_index(12)]
         #[pallet::weight(T::WeightInfo::freeze_identity())]
         pub fn freeze_identity(origin: OriginFor<T>, identity_id: IdentityId) -> DispatchResult {
@@ -539,6 +625,7 @@ pub mod pallet {
             })
         }
 
+        /// Reactivate a frozen identity.
         #[pallet::call_index(13)]
         #[pallet::weight(T::WeightInfo::unfreeze_identity())]
         pub fn unfreeze_identity(origin: OriginFor<T>, identity_id: IdentityId) -> DispatchResult {
@@ -563,6 +650,9 @@ pub mod pallet {
             })
         }
 
+        /// Permanently disable an identity.
+        ///
+        /// Disabled identities cannot be mutated or used for payment authorization.
         #[pallet::call_index(14)]
         #[pallet::weight(T::WeightInfo::disable_identity())]
         pub fn disable_identity(origin: OriginFor<T>, identity_id: IdentityId) -> DispatchResult {
@@ -585,22 +675,27 @@ pub mod pallet {
     }
 
     impl<T: Config> Pallet<T> {
+        /// Return the runtime timestamp in milliseconds.
         fn now() -> u64 {
             T::TimeProvider::now()
         }
+        /// Generate the next identity id from a domain-separated sequence hash.
         fn next_identity_id() -> Result<IdentityId, DispatchError> {
             let seq = NextIdentitySequence::<T>::get();
             NextIdentitySequence::<T>::put(seq.checked_add(1).ok_or(Error::<T>::Overflow)?);
             Ok(BlakeTwo256::hash_of(&(b"vibly/identity", seq)))
         }
+        /// Generate the next transport binding id from a domain-separated sequence hash.
         fn next_transport_id() -> Result<TransportBindingId, DispatchError> {
             let seq = NextTransportSequence::<T>::get();
             NextTransportSequence::<T>::put(seq.checked_add(1).ok_or(Error::<T>::Overflow)?);
             Ok(BlakeTwo256::hash_of(&(b"vibly/transport", seq)))
         }
+        /// Derive a delegated key id for an identity/account pair.
         fn key_id(identity_id: IdentityId, account: &T::AccountId) -> KeyId {
             BlakeTwo256::hash_of(&(b"vibly/key", identity_id, account))
         }
+        /// Derive the uniqueness locator for a transport binding.
         fn transport_locator(
             identity_id: IdentityId,
             transport: TransportKind,
@@ -608,10 +703,12 @@ pub mod pallet {
         ) -> Hash256 {
             BlakeTwo256::hash_of(&(b"vibly/transport-locator", identity_id, transport, account))
         }
+        /// Bump the identity nonce and update timestamp after a mutation.
         fn bump_identity(identity: &mut RootIdentityOf<T>) {
             identity.nonce = identity.nonce.saturating_add(1);
             identity.updated_at = Self::now();
         }
+        /// Enforce lifecycle restrictions before mutating identity-owned state.
         fn ensure_identity_state_for_mutation(
             identity: &RootIdentityOf<T>,
             scope: AccessScope,
@@ -625,6 +722,7 @@ pub mod pallet {
                 IdentityStatus::Active => Ok(()),
             }
         }
+        /// Enforce owner, recovery, or delegated capability authorization.
         fn ensure_actor(
             identity: &RootIdentityOf<T>,
             who: &T::AccountId,
@@ -655,6 +753,7 @@ pub mod pallet {
             );
             Ok(())
         }
+        /// Ensure a delegated key has not been revoked or expired.
         fn ensure_record_active(record: &AuthorizedKeyRecordOf<T>) -> Result<(), DispatchError> {
             ensure!(record.revoked_at.is_none(), Error::<T>::KeyRevoked);
             if let Some(expires_at) = record.expires_at {
@@ -662,6 +761,7 @@ pub mod pallet {
             }
             Ok(())
         }
+        /// Shared pointer mutation path that applies authorization and identity nonce updates.
         fn mutate_pointer(
             origin: OriginFor<T>,
             identity_id: IdentityId,
@@ -684,6 +784,10 @@ pub mod pallet {
         }
     }
 
+    /// Identity authorization implementation consumed by other pallets.
+    ///
+    /// Payment checks require an active identity and either the owner or a delegated key with
+    /// payment capability. Recovery accounts are not allowed to manage or claim payments.
     impl<T: Config> IdentityAccess<T::AccountId> for Pallet<T> {
         fn identity_exists(identity_id: &IdentityId) -> bool {
             Identities::<T>::contains_key(identity_id)

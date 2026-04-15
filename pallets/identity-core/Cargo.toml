@@ -21,8 +21,8 @@ vibly-primitives-common.workspace = true
 vibly-primitives-identity.workspace = true
 
 [dev-dependencies]
-sp-io = { version = "44.0.0", default-features = false }
-polkadot-sdk = { workspace = true, features = ["pallet-timestamp"], default-features = false }
+pallet-timestamp.workspace = true
+sp-io.workspace = true
 
 [features]
 default = ["std"]
@@ -31,9 +31,10 @@ std = [
 	"codec/std",
 	"frame/std",
 	"scale-info/std",
+	"pallet-timestamp/std",
 	"sp-core/std",
+	"sp-io/std",
 	"sp-runtime/std",
-	"polkadot-sdk/std",
 	"vibly-primitives-common/std",
 	"vibly-primitives-identity/std",
 ]

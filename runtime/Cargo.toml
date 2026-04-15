@@ -1,9 +1,9 @@
 [package]
 authors.workspace = true
-description = "The vibly-chain parachain runtime built on the Polkadot SDK parachain template."
+description = "The vibly-chain parachain runtime."
 edition.workspace = true
 homepage.workspace = true
-license = "Unlicense"
+license.workspace = true
 name = "vibly-chain-runtime"
 publish = false
 repository.workspace = true
@@ -11,6 +11,10 @@ version = "0.1.0"
 
 [package.metadata.docs.rs]
 targets = ["x86_64-unknown-linux-gnu"]
+
+[lib]
+test = false
+bench = false
 
 [lints]
 workspace = true

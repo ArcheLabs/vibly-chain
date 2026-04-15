@@ -1,18 +1,21 @@
 # Node
 
-ℹ️ A node -  in Polkadot - is a binary executable, whose primary purpose is to execute the [runtime](../runtime/README.md).
+The node crate builds the `vibly-chain-node` collator binary. It handles CLI
+parsing, chain-spec loading, RPC setup, consensus service wiring, and relay-chain
+argument forwarding.
 
-🔗 It communicates with other nodes in the network, and aims for
-[consensus](https://wiki.polkadot.network/docs/learn-consensus) among them.
+Important areas:
 
-⚙️ It acts as a remote procedure call (RPC) server, allowing interaction with the blockchain.
+- `src/cli.rs`: command-line interface and examples.
+- `src/chain_spec.rs`: development and local testnet chain specifications.
+- `src/command.rs`: subcommand execution and chain-spec loading.
+- `src/service.rs`: collator service construction.
+- `src/rpc.rs`: RPC module setup.
 
-👉 Learn more about the architecture, and the difference between a node and a runtime
-[here](https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/reference_docs/wasm_meta_protocol/index.html).
+Common commands:
 
-👇 Here are the most important files in this node template:
-
-- [`chain_spec.rs`](./src/chain_spec.rs): A chain specification is a source code file that defines the chain's
-initial (genesis) state.
-- [`service.rs`](./src/service.rs): This file defines the node implementation.
-It's a place to configure consensus-related topics.
+```bash
+cargo build --release -p vibly-chain-node
+./target/release/vibly-chain-node --help
+./target/release/vibly-chain-node --chain local --collator -- --chain rococo-local
+```

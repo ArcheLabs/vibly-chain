@@ -5,7 +5,6 @@ use frame::{
     runtime::prelude::*,
     testing_prelude::*,
 };
-use polkadot_sdk::{pallet_balances, pallet_timestamp};
 
 #[frame_construct_runtime]
 mod test_runtime {
@@ -102,7 +101,6 @@ impl pallet_balances::Config for Test {
 }
 
 impl pallet_identity_core::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = ();
     type TimeProvider = Timestamp;
     type MaxCidLen = IdentityCoreMaxCidLen;
@@ -111,7 +109,6 @@ impl pallet_identity_core::Config for Test {
 }
 
 impl crate::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
     type WeightInfo = ();
     type TimeProvider = Timestamp;
     type IdentityProvider = IdentityCore;

@@ -1,4 +1,4 @@
-//! Substrate Parachain Node Template CLI
+//! Vibly Chain parachain node CLI.
 
 #![warn(missing_docs)]
 

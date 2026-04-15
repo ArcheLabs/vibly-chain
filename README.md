@@ -1,65 +1,96 @@
 # vibly-chain
 
-A minimal truth parachain built from the Polkadot SDK parachain template baseline (`ab8a5f2c78653ffcc0b5b1a0e752a6ee49087b6a`).
+`vibly-chain` is a minimal truth parachain built with the Polkadot SDK. It keeps
+identity roots, identity-scoped pointers, external transport bindings, and native
+asset payment intents on chain.
 
 ## Scope
 
-- `pallet-identity-core`: on-chain root identity, authorized keys, active pointers, transport bindings.
-- `pallet-payment-intent`: on-chain payment intents for native asset `asset_id = 0` using balances transfer/hold.
-- No custom RPC, no action registry, no agent runtime, no Matrix integration.
+- `pallet-identity-core`: root identities, recovery accounts, delegated keys,
+  active content pointers, and external transport bindings.
+- `pallet-payment-intent`: native-asset payment intents for `asset_id = 0`,
+  including direct settlement and held-funds settlement.
+- `primitives/*`: shared SCALE types used by the runtime and custom pallets.
+- `node/`: the `vibly-chain-node` collator binary.
+- `runtime/`: parachain runtime wiring for the custom pallets and standard
+  FRAME/Cumulus pallets.
 
-## Workspace
+Current non-goals:
 
-- `node/`
-- `runtime/`
-- `primitives/common`
-- `primitives/identity`
-- `primitives/payment`
-- `pallets/identity-core`
-- `pallets/payment-intent`
-- `integration-tests/zombienet`
-- `scripts/dev`
-- `scripts/paseo`
+- No custom RPC layer.
+- No action registry pallet.
+- No agent runtime.
+- No Matrix, Discord, Telegram, or email integration logic beyond transport
+  binding records.
+- No automated governance, registrar access, or sudo-based upgrades.
+
+## Prerequisites
+
+- Rust toolchain from `rust-toolchain.toml`.
+- `wasm32-unknown-unknown` target, installed by rustup from the toolchain file.
+- Zombienet CLI for local multi-node smoke tests:
+
+```bash
+npm install -g @zombienet/cli
+zombienet setup polkadot
+```
+
+If `polkadot` is not on `PATH`, add the directory used by `zombienet setup
+polkadot` to your shell `PATH`.
 
 ## Common Commands
 
 ```bash
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
-cargo test --workspace
-cargo build --release -p parachain-template-node
+cargo test --workspace --exclude vibly-chain-node -j1
+cargo build --release -p vibly-chain-node
 ```
 
-## Dev Network
+## Local Network
 
-Use `scripts/dev/build.sh` and `scripts/dev/zombienet-local.sh` for a local relay chain + two collator setup.
-
-Prerequisites:
-
-- Rust target: `rustup target add wasm32-unknown-unknown`
-- Zombienet CLI: `npm install -g @zombienet/cli`
-- Relay chain binaries: `zombienet setup polkadot`
-
-Recommended verification:
-
-```bash
-zombienet version
-polkadot --version
-```
-
-Typical flow:
+Build the node and start a local relay chain with two collators:
 
 ```bash
 ./scripts/dev/build.sh
 ./scripts/dev/zombienet-local.sh
 ```
 
-Notes:
+Generate a plain development chain spec:
 
-- `scripts/dev/zombienet-local.sh` uses the native provider.
-- The script changes into the repository root before spawning the network, so it can be run from any working directory.
-- If `polkadot` is not on `PATH`, add the directory used by `zombienet setup polkadot` to your shell `PATH`.
+```bash
+./scripts/dev/chain-spec.sh
+```
 
-## Paseo
+The Zombienet config uses the native provider and expects the release binary at
+`./target/release/vibly-chain-node`.
 
-Use `scripts/paseo/build-artifacts.sh` to build release artifacts and `scripts/paseo/collator.sh` as a collator launch template. Registration and upgrade notes live in `scripts/paseo/README.md`.
+## Paseo Artifacts
+
+Build the release binary and export the genesis state/wasm for Paseo-style
+registration:
+
+```bash
+./scripts/paseo/build-artifacts.sh
+```
+
+Use `scripts/paseo/collator.sh` as a launch example after the parachain is
+registered. Registration and upgrade notes live in `scripts/paseo/README.md`.
+
+## Repository Map
+
+- `node/`: collator CLI, chain spec, RPC, and service wiring.
+- `runtime/`: runtime configuration, genesis presets, APIs, benchmarks, weights.
+- `pallets/identity-core/`: identity and transport-binding state machine.
+- `pallets/payment-intent/`: payment-intent state machine.
+- `primitives/common/`: shared base types.
+- `primitives/identity/`: identity data model and authorization trait.
+- `primitives/payment/`: payment-intent data model.
+- `integration-tests/zombienet/`: local network smoke-test configuration.
+- `scripts/dev/`: local build and chain-spec helpers.
+- `scripts/paseo/`: testnet artifact and collator helpers.
+
+## Contributing
+
+See `CONTRIBUTING.md` for local checks and contribution expectations. Report
+security issues using `SECURITY.md`.

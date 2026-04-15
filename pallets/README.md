@@ -1,13 +1,21 @@
 # Pallets
 
-ℹ️ A pallet is a unit of encapsulated logic, with a clearly defined responsibility. A pallet is analogous to a
-module in the runtime.
+This directory contains the custom vibly-chain FRAME pallets.
 
-💁 In this template, there is a simple custom pallet based on the FRAME framework.
+## `identity-core`
 
-👉 Learn more about FRAME
-[here](https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/polkadot_sdk/frame_runtime/index.html).
+Stores root identities, owner and recovery accounts, delegated authorization keys,
+active content pointers, and external transport bindings. Other pallets use its
+`IdentityAccess` implementation instead of reading identity storage directly.
 
-🧑‍🏫 Please refer to
-[this guide](https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/guides/your_first_pallet/index.html)
-to learn how to write a basic pallet.
+## `payment-intent`
+
+Stores native-asset payment intents between identity-backed actors. It supports
+direct settlement and hold-based settlement for `asset_id = 0`.
+
+## Checks
+
+```bash
+cargo test -p pallet-identity-core
+cargo test -p pallet-payment-intent
+```

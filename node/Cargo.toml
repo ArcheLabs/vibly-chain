@@ -1,14 +1,20 @@
 [package]
-name = "parachain-template-node"
+name = "vibly-chain-node"
 description = "A vibly-chain parachain node built with Substrate and Cumulus."
 version = "0.1.0"
-license = "Unlicense"
+license.workspace = true
 authors.workspace = true
 homepage.workspace = true
 repository.workspace = true
 edition.workspace = true
 publish = false
 build = "build.rs"
+
+[[bin]]
+name = "vibly-chain-node"
+path = "src/main.rs"
+test = false
+bench = false
 
 [lints]
 workspace = true

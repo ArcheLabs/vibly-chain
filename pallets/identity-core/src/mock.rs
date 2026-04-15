@@ -5,7 +5,6 @@ use frame::{
     runtime::prelude::*,
     testing_prelude::*,
 };
-use polkadot_sdk::pallet_timestamp;
 
 #[frame_construct_runtime]
 mod test_runtime {

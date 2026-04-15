@@ -1,10 +1,19 @@
 # Runtime
 
-ℹ️ The runtime (in other words, a state transition function), refers to the core logic of the parachain that is
-responsible for validating blocks and executing the state changes they define.
+The runtime is the vibly-chain state transition function. It wires the custom
+identity and payment pallets into the Polkadot SDK parachain runtime baseline and
+exposes the standard runtime APIs used by the collator node.
 
-💁 The runtime in this template is constructed using ready-made FRAME pallets that ship with
-[Polkadot SDK](https://github.com/paritytech/polkadot-sdk), and a [template for a custom pallet](../pallets/README.md).
+Important areas:
 
-👉 Learn more about FRAME
-[here](https://paritytech.github.io/polkadot-sdk/master/polkadot_sdk_docs/polkadot_sdk/frame_runtime/index.html).
+- `src/lib.rs`: runtime type definitions and pallet composition.
+- `src/configs/`: pallet configuration and XCM-related configuration.
+- `src/genesis_config_presets.rs`: development and local testnet genesis presets.
+- `src/benchmarks.rs`: runtime benchmark registration.
+- `src/weights/`: generated and static weight configuration.
+
+Build the runtime through the node package:
+
+```bash
+cargo build --release -p vibly-chain-node
+```

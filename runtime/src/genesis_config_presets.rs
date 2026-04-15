@@ -16,14 +16,14 @@ use sp_keyring::Sr25519Keyring;
 
 /// The default XCM version to set in genesis config.
 const SAFE_XCM_VERSION: u32 = xcm::prelude::XCM_VERSION;
-/// Parachain id used for genesis config presets of parachain template.
+/// Parachain id used for vibly-chain genesis config presets.
 #[docify::export_content]
 pub const PARACHAIN_ID: u32 = 1000;
 
 /// Generate the session keys from individual elements.
 ///
 /// The input must be a tuple of individual keys (a single arg for now since we have just one key).
-pub fn template_session_keys(keys: AuraId) -> SessionKeys {
+pub fn vibly_session_keys(keys: AuraId) -> SessionKeys {
     SessionKeys { aura: keys }
 }
 
@@ -55,9 +55,9 @@ fn testnet_genesis(
                 .into_iter()
                 .map(|(acc, aura)| {
                     (
-                        acc.clone(),                 // account id
-                        acc,                         // validator id
-                        template_session_keys(aura), // session keys
+                        acc.clone(),              // account id
+                        acc,                      // validator id
+                        vibly_session_keys(aura), // session keys
                     )
                 })
                 .collect::<Vec<_>>(),

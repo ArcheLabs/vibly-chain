@@ -18,10 +18,10 @@ cumulus_based = true
 
   [[parachains.collators]]
   name = "vibly-collator-1"
-  command = "./target/release/parachain-template-node"
+  command = "./target/release/vibly-chain-node"
   args = ["--collator", "--tmp", "--alice"]
 
   [[parachains.collators]]
   name = "vibly-collator-2"
-  command = "./target/release/parachain-template-node"
+  command = "./target/release/vibly-chain-node"
   args = ["--collator", "--tmp", "--bob"]
