@@ -1,0 +1,68 @@
+[package]
+authors.workspace = true
+description = "The vibly-chain standalone solo runtime."
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "vibly-solo-runtime"
+publish = false
+repository.workspace = true
+version = "0.1.0"
+
+[package.metadata.docs.rs]
+targets = ["x86_64-unknown-linux-gnu"]
+
+[lib]
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+codec = { features = ["derive"], workspace = true }
+log = { workspace = true }
+pallet-identity-core.workspace = true
+pallet-payment-intent.workspace = true
+pallet-vibly-emergency.workspace = true
+polkadot-sdk = { workspace = true, features = ["runtime"], default-features = false }
+scale-info = { features = ["derive"], workspace = true }
+serde_json = { workspace = true, default-features = false, features = ["alloc"] }
+smallvec = { workspace = true, default-features = false }
+vibly-primitives-common.workspace = true
+vibly-primitives-identity.workspace = true
+vibly-primitives-payment.workspace = true
+
+[build-dependencies]
+substrate-wasm-builder = { optional = true, workspace = true, default-features = true }
+
+[features]
+default = ["std"]
+metadata-hash = ["substrate-wasm-builder/metadata-hash"]
+on-chain-release-build = ["metadata-hash"]
+runtime-benchmarks = [
+  "pallet-identity-core/runtime-benchmarks",
+  "pallet-payment-intent/runtime-benchmarks",
+  "pallet-vibly-emergency/runtime-benchmarks",
+  "polkadot-sdk/runtime-benchmarks",
+]
+std = [
+  "codec/std",
+  "log/std",
+  "pallet-identity-core/std",
+  "pallet-payment-intent/std",
+  "pallet-vibly-emergency/std",
+  "polkadot-sdk/std",
+  "scale-info/std",
+  "serde_json/std",
+  "substrate-wasm-builder",
+  "vibly-primitives-common/std",
+  "vibly-primitives-identity/std",
+  "vibly-primitives-payment/std",
+]
+try-runtime = [
+  "pallet-identity-core/try-runtime",
+  "pallet-payment-intent/try-runtime",
+  "pallet-vibly-emergency/try-runtime",
+  "polkadot-sdk/try-runtime",
+]

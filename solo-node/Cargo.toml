@@ -1,0 +1,48 @@
+[package]
+authors.workspace = true
+description = "A vibly-chain standalone solo node."
+edition.workspace = true
+homepage.workspace = true
+license.workspace = true
+name = "vibly-solo-node"
+publish = false
+repository.workspace = true
+version = "0.1.0"
+build = "build.rs"
+
+[[bin]]
+name = "vibly-solo-node"
+path = "src/main.rs"
+test = false
+bench = false
+
+[lints]
+workspace = true
+
+[dependencies]
+clap = { features = ["derive"], workspace = true }
+color-print.workspace = true
+futures.workspace = true
+log = { workspace = true, default-features = true }
+polkadot-sdk = { workspace = true, features = ["node"] }
+serde = { features = ["derive"], workspace = true, default-features = true }
+vibly-solo-runtime.workspace = true
+
+[build-dependencies]
+polkadot-sdk = { workspace = true, features = ["substrate-build-script-utils"] }
+
+[features]
+default = ["std"]
+runtime-benchmarks = [
+  "polkadot-sdk/runtime-benchmarks",
+  "vibly-solo-runtime/runtime-benchmarks",
+]
+std = [
+  "log/std",
+  "polkadot-sdk/std",
+  "vibly-solo-runtime/std",
+]
+try-runtime = [
+  "polkadot-sdk/try-runtime",
+  "vibly-solo-runtime/try-runtime",
+]

@@ -19177,6 +19177,38 @@ dependencies = [
 ]
 
 [[package]]
+name = "vibly-solo-node"
+version = "0.1.0"
+dependencies = [
+ "clap",
+ "color-print",
+ "futures",
+ "log",
+ "polkadot-sdk",
+ "serde",
+ "vibly-solo-runtime",
+]
+
+[[package]]
+name = "vibly-solo-runtime"
+version = "0.1.0"
+dependencies = [
+ "log",
+ "pallet-identity-core",
+ "pallet-payment-intent",
+ "pallet-vibly-emergency",
+ "parity-scale-codec",
+ "polkadot-sdk",
+ "scale-info",
+ "serde_json",
+ "smallvec",
+ "substrate-wasm-builder",
+ "vibly-primitives-common",
+ "vibly-primitives-identity",
+ "vibly-primitives-payment",
+]
+
+[[package]]
 name = "void"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"

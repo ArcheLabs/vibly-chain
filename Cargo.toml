@@ -10,6 +10,8 @@ default-members = ["node", "runtime"]
 members = [
   "node",
   "runtime",
+  "solo-node",
+  "solo-runtime",
   "primitives/common",
   "primitives/identity",
   "primitives/payment",
@@ -83,6 +85,7 @@ sp-io = {version = "44.0.0", default-features = false}
 sp-runtime = {version = "45.0.0", default-features = false}
 substrate-wasm-builder = {version = "31.1.0", default-features = false}
 vibly-chain-runtime = {path = "./runtime", default-features = false}
+vibly-solo-runtime = {path = "./solo-runtime", default-features = false}
 vibly-primitives-common = {path = "./primitives/common", default-features = false}
 vibly-primitives-identity = {path = "./primitives/identity", default-features = false}
 vibly-primitives-payment = {path = "./primitives/payment", default-features = false}
