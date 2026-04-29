@@ -13,7 +13,7 @@ version = "0.1.0"
 targets = ["x86_64-unknown-linux-gnu"]
 
 [lib]
-test = false
+test = true
 bench = false
 
 [lints]
@@ -25,7 +25,20 @@ log = { workspace = true }
 pallet-identity-core.workspace = true
 pallet-payment-intent.workspace = true
 pallet-vibly-emergency.workspace = true
-polkadot-sdk = { workspace = true, features = ["runtime"], default-features = false }
+polkadot-sdk = { workspace = true, features = [
+  "frame-metadata-hash-extension",
+  "frame-system-rpc-runtime-api",
+  "pallet-aura",
+  "pallet-balances",
+  "pallet-collective",
+  "pallet-grandpa",
+  "pallet-membership",
+  "pallet-sudo",
+  "pallet-timestamp",
+  "pallet-transaction-payment",
+  "pallet-transaction-payment-rpc-runtime-api",
+  "runtime",
+], default-features = false }
 scale-info = { features = ["derive"], workspace = true }
 serde_json = { workspace = true, default-features = false, features = ["alloc"] }
 smallvec = { workspace = true, default-features = false }
