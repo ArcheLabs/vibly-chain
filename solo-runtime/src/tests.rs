@@ -46,6 +46,7 @@ fn new_test_ext() -> sp_io::TestExternalities {
         },
         guardian_collective: Default::default(),
         transaction_payment: Default::default(),
+        treasury: Default::default(),
     }
     .build_storage()
     .unwrap();

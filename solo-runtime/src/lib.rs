@@ -13,10 +13,7 @@ use alloc::vec::Vec;
 use frame_support::{
     derive_impl,
     parameter_types,
-    traits::{
-        ConstBool, ConstU32, ConstU64, ConstU8, EnsureOrigin, Get, InitializeMembers,
-        ChangeMembers, SortedMembers, VariantCountOf,
-    },
+    traits::{ConstBool, ConstU32, ConstU64, ConstU8, EnsureOrigin, Get, InitializeMembers, ChangeMembers, SortedMembers, VariantCountOf},
     weights::{
         constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
         WeightToFeeCoefficients, WeightToFeePolynomial,
@@ -27,6 +24,7 @@ use frame_system::EnsureRoot;
 use pallet_collective::{EnsureProportionAtLeast, Instance1};
 use pallet_vibly_emergency::EmergencyScope;
 use polkadot_sdk::*;
+use sp_runtime::traits::AccountIdConversion;
 use smallvec::smallvec;
 use sp_runtime::{
     generic, impl_opaque_keys,
@@ -175,6 +173,34 @@ parameter_types! {
     pub const GuardianMaxProposals: u32 = 100;
     pub const GuardianMaxMembers: u32 = 100;
     pub MaxProposalWeight: Weight = MAXIMUM_BLOCK_WEIGHT;
+
+    // Treasury
+    pub const ProposalBond: sp_runtime::Permill = sp_runtime::Permill::from_percent(5);
+    pub const ProposalBondMinimum: Balance = UNIT;
+    pub const ProposalBondMaximum: Balance = 100 * UNIT;
+    pub const SpendPeriod: BlockNumber = 7 * DAYS;
+    pub const MaxApprovals: u32 = 100;
+    pub const TreasurySpendOriginMaxAmount: Balance = Balance::MAX;
+    pub TreasuryAccount: AccountId = TreasuryPalletId::get().into_account_truncating();
+
+    // Referenda / ConvictionVoting
+    pub const VoteLockingPeriod: BlockNumber = 7 * DAYS;
+    pub const MaxVotes: u32 = 512;
+    pub const MaxTurnout: u128 = 1_000_000 * UNIT;
+    pub const AlarmInterval: BlockNumber = 1;
+    pub const SubmissionDeposit: Balance = UNIT;
+    pub const UndecidingTimeout: BlockNumber = 14 * DAYS;
+
+    // Preimage
+    pub const PreimageBaseDeposit: Balance = UNIT;
+    pub const PreimageByteDeposit: Balance = MICRO_UNIT;
+    pub const PreimageHoldReason: RuntimeHoldReason =
+        RuntimeHoldReason::Preimage(pallet_preimage::HoldReason::Preimage);
+
+    // Scheduler
+    pub MaximumSchedulerWeight: Weight = MAXIMUM_BLOCK_WEIGHT;
+    pub const MaxScheduledPerBlock: u32 = 512;
+    pub const NoPreimagePostponement: Option<BlockNumber> = Some(10);
 }
 
 #[derive_impl(frame_system::config_preludes::SolochainDefaultConfig)]
@@ -354,6 +380,169 @@ impl pallet_collective::Config<Instance1> for Runtime {
     type Consideration = ();
 }
 
+// ── OpenGov pallets ──────────────────────────────────────────────────────────
+
+impl pallet_preimage::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = ();
+    type Currency = Balances;
+    type ManagerOrigin = EnsureRoot<AccountId>;
+    type Consideration = ();
+}
+
+impl pallet_scheduler::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeOrigin = RuntimeOrigin;
+    type PalletsOrigin = OriginCaller;
+    type RuntimeCall = RuntimeCall;
+    type MaximumWeight = MaximumSchedulerWeight;
+    type ScheduleOrigin = EnsureRoot<AccountId>;
+    type MaxScheduledPerBlock = MaxScheduledPerBlock;
+    type WeightInfo = ();
+    type OriginPrivilegeCmp = frame_support::traits::EqualPrivilegeOnly;
+    type Preimages = Preimage;
+    type BlockNumberProvider = frame_system::Pallet<Runtime>;
+}
+
+pub struct TracksInfo;
+impl pallet_referenda::TracksInfo<Balance, BlockNumber> for TracksInfo {
+    type Id = u16;
+    type RuntimeOrigin = OriginCaller;
+    fn tracks() -> impl Iterator<Item = alloc::borrow::Cow<'static, pallet_referenda::Track<Self::Id, Balance, BlockNumber>>> {
+        [pallet_referenda::Track {
+            id: 0,
+            info: pallet_referenda::TrackInfo {
+                name: *b"root\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0",
+                max_deciding: 1,
+                decision_deposit: 10 * UNIT,
+                prepare_period: HOURS,
+                decision_period: 7 * DAYS,
+                confirm_period: HOURS,
+                min_enactment_period: HOURS,
+                min_approval: pallet_referenda::Curve::LinearDecreasing {
+                    length: sp_runtime::Perbill::from_percent(100),
+                    floor: sp_runtime::Perbill::from_percent(50),
+                    ceil: sp_runtime::Perbill::from_percent(100),
+                },
+                min_support: pallet_referenda::Curve::LinearDecreasing {
+                    length: sp_runtime::Perbill::from_percent(100),
+                    floor: sp_runtime::Perbill::from_percent(0),
+                    ceil: sp_runtime::Perbill::from_percent(50),
+                },
+            },
+        }]
+        .into_iter()
+        .map(alloc::borrow::Cow::Owned)
+    }
+    fn track_for(_id: &Self::RuntimeOrigin) -> Result<Self::Id, ()> {
+        // Single root track; all proposals route here for early testnet.
+        Ok(0)
+    }
+}
+
+impl pallet_referenda::Config for Runtime {
+    type RuntimeCall = RuntimeCall;
+    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = ();
+    type Scheduler = Scheduler;
+    type Currency = Balances;
+    type SubmitOrigin = frame_system::EnsureSigned<AccountId>;
+    type CancelOrigin = EnsureRoot<AccountId>;
+    type KillOrigin = EnsureRoot<AccountId>;
+    type Slash = ();
+    type Votes = pallet_conviction_voting::VotesOf<Runtime>;
+    type Tally = pallet_conviction_voting::TallyOf<Runtime>;
+    type SubmissionDeposit = SubmissionDeposit;
+    type MaxQueued = ConstU32<100>;
+    type UndecidingTimeout = UndecidingTimeout;
+    type AlarmInterval = AlarmInterval;
+    type Tracks = TracksInfo;
+    type Preimages = Preimage;
+    type BlockNumberProvider = frame_system::Pallet<Runtime>;
+}
+
+impl pallet_conviction_voting::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type VoteLockingPeriod = VoteLockingPeriod;
+    type MaxVotes = MaxVotes;
+    type MaxTurnout = frame_support::traits::TotalIssuanceOf<Balances, AccountId>;
+    type Polls = Referenda;
+    type WeightInfo = ();
+    type VotingHooks = ();
+    type BlockNumberProvider = frame_system::Pallet<Runtime>;
+}
+
+impl pallet_whitelist::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type RuntimeCall = RuntimeCall;
+    type WhitelistOrigin = EnsureRoot<AccountId>;
+    type DispatchWhitelistedOrigin = EnsureRoot<AccountId>;
+    type Preimages = Preimage;
+    type WeightInfo = ();
+}
+
+impl pallet_treasury::Config for Runtime {
+    type PalletId = TreasuryPalletId;
+    type Currency = Balances;
+    type RejectOrigin = EnsureRoot<AccountId>;
+    type RuntimeEvent = RuntimeEvent;
+    type SpendPeriod = SpendPeriod;
+    type Burn = ();
+    type BurnDestination = ();
+    type SpendFunds = Bounties;
+    type MaxApprovals = MaxApprovals;
+    type WeightInfo = ();
+    type SpendOrigin = frame_support::traits::NeverEnsureOrigin<Balance>;
+    type AssetKind = ();
+    type Beneficiary = AccountId;
+    type BeneficiaryLookup = sp_runtime::traits::IdentityLookup<AccountId>;
+    type Paymaster = frame_support::traits::tokens::pay::PayFromAccount<Balances, TreasuryAccount>;
+    type BalanceConverter = frame_support::traits::tokens::UnityAssetBalanceConversion;
+    type PayoutPeriod = ConstU32<10>;
+    type BlockNumberProvider = frame_system::Pallet<Runtime>;
+    #[cfg(feature = "runtime-benchmarks")]
+    type BenchmarkHelper = ();
+}
+
+parameter_types! {
+    pub const BountyDepositBase: Balance = UNIT;
+    pub const BountyDepositPayoutDelay: BlockNumber = 2 * DAYS;
+    pub const BountyUpdatePeriod: BlockNumber = 14 * DAYS;
+    pub const CuratorDepositMultiplier: sp_runtime::Permill = sp_runtime::Permill::from_percent(50);
+    pub const CuratorDepositMin: Balance = UNIT / 2;
+    pub const CuratorDepositMax: Balance = 100 * UNIT;
+    pub const BountyValueMinimum: Balance = UNIT;
+    pub const DataDepositPerByte: Balance = MICRO_UNIT;
+}
+
+impl pallet_bounties::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type BountyDepositBase = BountyDepositBase;
+    type BountyDepositPayoutDelay = BountyDepositPayoutDelay;
+    type BountyUpdatePeriod = BountyUpdatePeriod;
+    type CuratorDepositMultiplier = CuratorDepositMultiplier;
+    type CuratorDepositMin = CuratorDepositMin;
+    type CuratorDepositMax = CuratorDepositMax;
+    type BountyValueMinimum = BountyValueMinimum;
+    type DataDepositPerByte = DataDepositPerByte;
+    type MaximumReasonLength = ConstU32<16384>;
+    type WeightInfo = ();
+    type ChildBountyManager = ChildBounties;
+    type OnSlash = ();
+    #[cfg(feature = "runtime-benchmarks")]
+    type BenchmarkHelper = ();
+}
+
+impl pallet_child_bounties::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type MaxActiveChildBountyCount = ConstU32<100>;
+    type ChildBountyValueMinimum = BountyValueMinimum;
+    type WeightInfo = ();
+}
+
+// ── Guardian Emergency origin ─────────────────────────────────────────────────
+
 pub struct EnsureGuardianMember;
 impl EnsureOrigin<RuntimeOrigin> for EnsureGuardianMember {
     type Success = AccountId;
@@ -431,6 +620,24 @@ mod runtime {
     pub type PaymentIntent = pallet_payment_intent;
     #[runtime::pallet_index(52)]
     pub type ViblyEmergency = pallet_vibly_emergency;
+
+    // OpenGov
+    #[runtime::pallet_index(60)]
+    pub type Preimage = pallet_preimage;
+    #[runtime::pallet_index(61)]
+    pub type Scheduler = pallet_scheduler;
+    #[runtime::pallet_index(62)]
+    pub type Referenda = pallet_referenda;
+    #[runtime::pallet_index(63)]
+    pub type ConvictionVoting = pallet_conviction_voting;
+    #[runtime::pallet_index(64)]
+    pub type Whitelist = pallet_whitelist;
+    #[runtime::pallet_index(65)]
+    pub type Treasury = pallet_treasury;
+    #[runtime::pallet_index(66)]
+    pub type Bounties = pallet_bounties;
+    #[runtime::pallet_index(67)]
+    pub type ChildBounties = pallet_child_bounties;
 }
 
 pub fn guardian_scope(id: u64) -> EmergencyScope {
@@ -635,6 +842,7 @@ pub mod genesis_config_presets {
             },
             guardian_collective: Default::default(),
             transaction_payment: Default::default(),
+            treasury: Default::default(),
         }
     }
 
