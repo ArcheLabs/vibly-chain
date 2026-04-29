@@ -21,11 +21,16 @@ workspace = true
 
 [dependencies]
 clap = { features = ["derive"], workspace = true }
+codec = { workspace = true, default-features = true }
 color-print.workspace = true
 futures.workspace = true
+jsonrpsee = { features = ["server"], workspace = true }
 log = { workspace = true, default-features = true }
 polkadot-sdk = { workspace = true, features = ["node"] }
+prometheus-endpoint.default-features = true
+prometheus-endpoint.workspace = true
 serde = { features = ["derive"], workspace = true, default-features = true }
+serde_json = { workspace = true, default-features = true }
 vibly-solo-runtime.workspace = true
 
 [build-dependencies]

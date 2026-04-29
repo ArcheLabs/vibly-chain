@@ -19183,9 +19183,13 @@ dependencies = [
  "clap",
  "color-print",
  "futures",
+ "jsonrpsee",
  "log",
+ "parity-scale-codec",
  "polkadot-sdk",
  "serde",
+ "serde_json",
+ "substrate-prometheus-endpoint",
  "vibly-solo-runtime",
 ]
 
