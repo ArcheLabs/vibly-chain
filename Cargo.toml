@@ -15,6 +15,7 @@ members = [
   "primitives/payment",
   "pallets/identity-core",
   "pallets/payment-intent",
+  "pallets/vibly-emergency",
 ]
 resolver = "2"
 
@@ -68,6 +69,7 @@ jsonrpsee = {version = "0.24.10"}
 log = {version = "0.4.22", default-features = false}
 pallet-identity-core = {path = "./pallets/identity-core", default-features = false}
 pallet-payment-intent = {path = "./pallets/payment-intent", default-features = false}
+pallet-vibly-emergency = {path = "./pallets/vibly-emergency", default-features = false}
 pallet-balances = {version = "46.0.0", default-features = false}
 pallet-timestamp = {version = "44.0.0", default-features = false}
 polkadot-sdk = {version = "2512.3.3", default-features = false}

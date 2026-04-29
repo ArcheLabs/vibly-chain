@@ -10585,6 +10585,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-vibly-emergency"
+version = "0.1.0"
+dependencies = [
+ "parity-scale-codec",
+ "polkadot-sdk-frame",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+]
+
+[[package]]
 name = "pallet-whitelist"
 version = "44.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
