@@ -25,9 +25,10 @@ pub mod pallet {
     use sp_runtime::traits::{BlakeTwo256, Hash as HashT};
     use vibly_primitives_common::{CapabilityMask, ContentRef, Hash256};
     use vibly_primitives_identity::{
-        AuthorizedKeyRecord, IdentityAccess, IdentityId, IdentityStatus, KeyId, KeyPurpose,
-        RootIdentity, TransportBinding, TransportBindingId, TransportBindingStatus, TransportKind,
-        CAP_ADMIN, CAP_MANAGE_PAYMENT, CAP_MANAGE_POINTERS, CAP_MANAGE_TRANSPORTS,
+        AuthorizedKeyRecord, EvmAddress, IdentityAccess, IdentityId, IdentityStatus, KeyId,
+        KeyPurpose, RootIdentity, TransportBinding, TransportBindingId, TransportBindingStatus,
+        TransportKind, CAP_ADMIN, CAP_MANAGE_PAYMENT, CAP_MANAGE_POINTERS, CAP_MANAGE_TRANSPORTS,
+        CAP_REGISTER_AGENT,
     };
 
     type RootIdentityOf<T> = RootIdentity<
@@ -53,6 +54,8 @@ pub mod pallet {
         TransportManager,
         /// Payment intent management for cross-pallet authorization.
         PaymentManager,
+        /// Agent registration only.
+        AgentRegistrar,
     }
 
     #[pallet::config]
@@ -95,6 +98,18 @@ pub mod pallet {
     /// Uniqueness index for `(identity_id, transport, transport_account)`.
     pub type TransportBindingByIdentityAndLocator<T: Config> =
         StorageMap<_, Blake2_128Concat, Hash256, TransportBindingId>;
+    #[pallet::storage]
+    /// Reverse lookup from an EVM root address to the Vibly identity it controls.
+    pub type IdentityIdByEvmAddress<T: Config> =
+        StorageMap<_, Blake2_128Concat, EvmAddress, IdentityId>;
+    #[pallet::storage]
+    /// EVM root address bound to a Vibly identity.
+    pub type EvmAddressByIdentityId<T: Config> =
+        StorageMap<_, Blake2_128Concat, IdentityId, EvmAddress>;
+    #[pallet::storage]
+    /// Current restricted AgentRegistrar account for an identity.
+    pub type AgentRegistrarByIdentityId<T: Config> =
+        StorageMap<_, Blake2_128Concat, IdentityId, T::AccountId>;
     #[pallet::storage]
     /// Monotonic sequence used to derive identity ids.
     pub type NextIdentitySequence<T> = StorageValue<_, u64, ValueQuery>;
@@ -160,6 +175,18 @@ pub mod pallet {
         IdentityUnfrozen { identity_id: IdentityId },
         /// An identity was permanently disabled.
         IdentityDisabled { identity_id: IdentityId },
+        /// An EVM address was bound as an external identity root.
+        EvmRootBound {
+            identity_id: IdentityId,
+            evm_address: EvmAddress,
+        },
+        /// An AgentRegistrar account was authorized for an identity.
+        AgentRegistrarSet {
+            identity_id: IdentityId,
+            agent_registrar: T::AccountId,
+        },
+        /// An AgentRegistrar account was revoked for an identity.
+        AgentRegistrarRevoked { identity_id: IdentityId },
     }
 
     #[pallet::error]
@@ -211,6 +238,10 @@ pub mod pallet {
         Overflow,
         /// Generic invalid input.
         InvalidInput,
+        /// The EVM root address is already bound to an identity.
+        EvmAddressAlreadyBound,
+        /// The EVM root address is not bound to an identity.
+        EvmAddressNotBound,
     }
 
     #[pallet::call]
@@ -695,6 +726,145 @@ pub mod pallet {
         fn key_id(identity_id: IdentityId, account: &T::AccountId) -> KeyId {
             BlakeTwo256::hash_of(&(b"vibly/key", identity_id, account))
         }
+        /// Register a Vibly identity from a relayer-verified EVM onboarding flow.
+        pub fn register_evm_identity_from_relayer(
+            evm_address: EvmAddress,
+            owner: T::AccountId,
+            agent_registrar: T::AccountId,
+        ) -> Result<IdentityId, DispatchError> {
+            ensure!(
+                !IdentityIdByEvmAddress::<T>::contains_key(evm_address),
+                Error::<T>::EvmAddressAlreadyBound
+            );
+            let identity_id = Self::next_identity_id()?;
+            let now = Self::now();
+            Identities::<T>::insert(
+                identity_id,
+                RootIdentity {
+                    identity_id,
+                    owner: owner.clone(),
+                    recovery: None,
+                    active_profile: None,
+                    active_agent_registry: None,
+                    active_auth_registry: None,
+                    active_relation_policy: None,
+                    status: IdentityStatus::Active,
+                    nonce: 0,
+                    created_at: now,
+                    updated_at: now,
+                },
+            );
+            IdentityIdByEvmAddress::<T>::insert(evm_address, identity_id);
+            EvmAddressByIdentityId::<T>::insert(identity_id, evm_address);
+            Self::set_agent_registrar_record(identity_id, agent_registrar.clone(), now)?;
+            Self::deposit_event(Event::IdentityRegistered { identity_id, owner });
+            Self::deposit_event(Event::EvmRootBound {
+                identity_id,
+                evm_address,
+            });
+            Self::deposit_event(Event::AgentRegistrarSet {
+                identity_id,
+                agent_registrar,
+            });
+            Ok(identity_id)
+        }
+        /// Rotate the Vibly owner account after an off-chain EVM authorization was verified.
+        pub fn rotate_owner_for_evm_root(
+            evm_address: EvmAddress,
+            new_owner: T::AccountId,
+        ) -> DispatchResult {
+            let identity_id = IdentityIdByEvmAddress::<T>::get(evm_address)
+                .ok_or(Error::<T>::EvmAddressNotBound)?;
+            Identities::<T>::try_mutate(identity_id, |maybe_identity| -> DispatchResult {
+                let identity = maybe_identity
+                    .as_mut()
+                    .ok_or(Error::<T>::IdentityNotFound)?;
+                Self::ensure_identity_state_for_mutation(identity, AccessScope::OwnerOrRecovery)?;
+                let old_owner = identity.owner.clone();
+                identity.owner = new_owner.clone();
+                Self::bump_identity(identity);
+                Self::deposit_event(Event::OwnerKeyRotated {
+                    identity_id,
+                    old_owner,
+                    new_owner,
+                });
+                Ok(())
+            })
+        }
+        /// Set or replace the restricted AgentRegistrar for an identity.
+        pub fn set_agent_registrar_from_owner(
+            identity_id: IdentityId,
+            owner: &T::AccountId,
+            agent_registrar: T::AccountId,
+        ) -> DispatchResult {
+            Identities::<T>::try_mutate(identity_id, |maybe_identity| -> DispatchResult {
+                let identity = maybe_identity
+                    .as_mut()
+                    .ok_or(Error::<T>::IdentityNotFound)?;
+                Self::ensure_identity_state_for_mutation(identity, AccessScope::OwnerOrRecovery)?;
+                Self::ensure_actor(identity, owner, AccessScope::OwnerOrRecovery)?;
+                Self::set_agent_registrar_record(
+                    identity_id,
+                    agent_registrar.clone(),
+                    Self::now(),
+                )?;
+                Self::bump_identity(identity);
+                Self::deposit_event(Event::AgentRegistrarSet {
+                    identity_id,
+                    agent_registrar,
+                });
+                Ok(())
+            })
+        }
+        /// Revoke the restricted AgentRegistrar for an identity.
+        pub fn revoke_agent_registrar_from_owner(
+            identity_id: IdentityId,
+            owner: &T::AccountId,
+        ) -> DispatchResult {
+            Identities::<T>::try_mutate(identity_id, |maybe_identity| -> DispatchResult {
+                let identity = maybe_identity
+                    .as_mut()
+                    .ok_or(Error::<T>::IdentityNotFound)?;
+                Self::ensure_identity_state_for_mutation(identity, AccessScope::OwnerOrRecovery)?;
+                Self::ensure_actor(identity, owner, AccessScope::OwnerOrRecovery)?;
+                if let Some(account) = AgentRegistrarByIdentityId::<T>::take(identity_id) {
+                    let key_id = Self::key_id(identity_id, &account);
+                    AuthorizedKeys::<T>::remove(key_id);
+                    AuthorizedKeyIdByAccount::<T>::remove((identity_id, account));
+                }
+                Self::bump_identity(identity);
+                Self::deposit_event(Event::AgentRegistrarRevoked { identity_id });
+                Ok(())
+            })
+        }
+        fn set_agent_registrar_record(
+            identity_id: IdentityId,
+            agent_registrar: T::AccountId,
+            now: u64,
+        ) -> DispatchResult {
+            if let Some(previous) = AgentRegistrarByIdentityId::<T>::get(identity_id) {
+                let previous_key_id = Self::key_id(identity_id, &previous);
+                AuthorizedKeys::<T>::remove(previous_key_id);
+                AuthorizedKeyIdByAccount::<T>::remove((identity_id, previous));
+            }
+            let key_id = Self::key_id(identity_id, &agent_registrar);
+            AuthorizedKeys::<T>::insert(
+                key_id,
+                AuthorizedKeyRecord {
+                    key_id,
+                    identity_id,
+                    account: agent_registrar.clone(),
+                    purpose: KeyPurpose::AgentRegistrar,
+                    capability_mask: CAP_REGISTER_AGENT,
+                    expires_at: None,
+                    revoked_at: None,
+                    created_at: now,
+                },
+            );
+            AuthorizedKeyIdByAccount::<T>::insert((identity_id, agent_registrar.clone()), key_id);
+            AgentRegistrarByIdentityId::<T>::insert(identity_id, agent_registrar);
+            Ok(())
+        }
         /// Derive the uniqueness locator for a transport binding.
         fn transport_locator(
             identity_id: IdentityId,
@@ -746,6 +916,7 @@ pub mod pallet {
                 AccessScope::PointerManager => CAP_MANAGE_POINTERS,
                 AccessScope::TransportManager => CAP_MANAGE_TRANSPORTS,
                 AccessScope::PaymentManager => CAP_MANAGE_PAYMENT,
+                AccessScope::AgentRegistrar => CAP_REGISTER_AGENT,
             };
             ensure!(
                 record.capability_mask & (required | CAP_ADMIN) != 0,
@@ -811,6 +982,17 @@ pub mod pallet {
             who: &T::AccountId,
         ) -> DispatchResult {
             Self::ensure_can_manage_payment(identity_id, who)
+        }
+        fn ensure_can_register_agent(
+            identity_id: &IdentityId,
+            who: &T::AccountId,
+        ) -> DispatchResult {
+            let identity = Identities::<T>::get(identity_id).ok_or(Error::<T>::IdentityNotFound)?;
+            ensure!(
+                identity.status == IdentityStatus::Active,
+                Error::<T>::InvalidState
+            );
+            Self::ensure_actor(&identity, who, AccessScope::AgentRegistrar)
         }
     }
 }

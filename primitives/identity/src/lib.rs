@@ -11,6 +11,8 @@ pub type ActorId = IdentityId;
 pub type KeyId = Hash256;
 /// Stable identifier for an external transport binding.
 pub type TransportBindingId = Hash256;
+/// Ethereum-compatible externally owned account address.
+pub type EvmAddress = [u8; 20];
 /// Application-defined key purpose code.
 pub type PurposeCode = u16;
 
@@ -22,6 +24,8 @@ pub const CAP_MANAGE_TRANSPORTS: CapabilityMask = 1 << 1;
 pub const CAP_MANAGE_PAYMENT: CapabilityMask = 1 << 2;
 /// Allows a delegated key to satisfy any non-owner capability check.
 pub const CAP_ADMIN: CapabilityMask = 1 << 3;
+/// Allows a delegated key to register agents for an identity.
+pub const CAP_REGISTER_AGENT: CapabilityMask = 1 << 4;
 
 /// Lifecycle status for a root identity.
 #[derive(
@@ -71,6 +75,8 @@ pub enum KeyPurpose {
     Butler,
     /// Finance key intended for payment-related workflows.
     Finance,
+    /// Restricted key intended only for agent registration.
+    AgentRegistrar,
     /// Custom purpose code for application-specific delegation.
     Custom(PurposeCode),
 }
@@ -251,4 +257,6 @@ pub trait IdentityAccess<AccountId> {
     fn ensure_can_manage_payment(identity_id: &IdentityId, who: &AccountId) -> DispatchResult;
     /// Ensures `who` may claim payment intents for `identity_id`.
     fn ensure_can_claim_payment(identity_id: &IdentityId, who: &AccountId) -> DispatchResult;
+    /// Ensures `who` may register agents for `identity_id`.
+    fn ensure_can_register_agent(identity_id: &IdentityId, who: &AccountId) -> DispatchResult;
 }

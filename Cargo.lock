@@ -9729,6 +9729,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-onboarding-distribution"
+version = "0.1.0"
+dependencies = [
+ "pallet-balances",
+ "pallet-identity-core",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "polkadot-sdk-frame",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "vibly-primitives-common",
+ "vibly-primitives-identity",
+]
+
+[[package]]
 name = "pallet-oracle"
 version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19199,6 +19216,7 @@ version = "0.1.0"
 dependencies = [
  "log",
  "pallet-identity-core",
+ "pallet-onboarding-distribution",
  "pallet-payment-intent",
  "pallet-vibly-emergency",
  "parity-scale-codec",

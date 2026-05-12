@@ -23,6 +23,7 @@ workspace = true
 codec = { features = ["derive"], workspace = true }
 log = { workspace = true }
 pallet-identity-core.workspace = true
+pallet-onboarding-distribution.workspace = true
 pallet-payment-intent.workspace = true
 pallet-vibly-emergency.workspace = true
 polkadot-sdk = { workspace = true, features = [
@@ -30,21 +31,13 @@ polkadot-sdk = { workspace = true, features = [
   "frame-system-rpc-runtime-api",
   "pallet-aura",
   "pallet-balances",
-  "pallet-bounties",
-  "pallet-child-bounties",
   "pallet-collective",
-  "pallet-conviction-voting",
   "pallet-grandpa",
   "pallet-membership",
-  "pallet-preimage",
-  "pallet-referenda",
-  "pallet-scheduler",
   "pallet-sudo",
   "pallet-timestamp",
   "pallet-transaction-payment",
   "pallet-transaction-payment-rpc-runtime-api",
-  "pallet-treasury",
-  "pallet-whitelist",
   "runtime",
 ], default-features = false }
 scale-info = { features = ["derive"], workspace = true }
@@ -63,6 +56,7 @@ metadata-hash = ["substrate-wasm-builder/metadata-hash"]
 on-chain-release-build = ["metadata-hash"]
 runtime-benchmarks = [
   "pallet-identity-core/runtime-benchmarks",
+  "pallet-onboarding-distribution/runtime-benchmarks",
   "pallet-payment-intent/runtime-benchmarks",
   "pallet-vibly-emergency/runtime-benchmarks",
   "polkadot-sdk/runtime-benchmarks",
@@ -71,6 +65,7 @@ std = [
   "codec/std",
   "log/std",
   "pallet-identity-core/std",
+  "pallet-onboarding-distribution/std",
   "pallet-payment-intent/std",
   "pallet-vibly-emergency/std",
   "polkadot-sdk/std",
@@ -83,6 +78,7 @@ std = [
 ]
 try-runtime = [
   "pallet-identity-core/try-runtime",
+  "pallet-onboarding-distribution/try-runtime",
   "pallet-payment-intent/try-runtime",
   "pallet-vibly-emergency/try-runtime",
   "polkadot-sdk/try-runtime",
