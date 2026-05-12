@@ -170,6 +170,7 @@ parameter_types! {
     pub const GuardianMaxProposals: u32 = 100;
     pub const GuardianMaxMembers: u32 = 100;
     pub MaxProposalWeight: Weight = MAXIMUM_BLOCK_WEIGHT;
+    pub const AgentStakeUnbondingPeriod: BlockNumber = 10 * MINUTES;
 }
 
 #[derive_impl(frame_system::config_preludes::SolochainDefaultConfig)]
@@ -298,6 +299,17 @@ impl pallet_onboarding_distribution::Config for Runtime {
     type Currency = Balances;
     type MaxAgentRefCidLen = IdentityMaxCidLen;
     type MaxAgentRefUriLen = IdentityMaxUriLen;
+}
+
+impl pallet_agent_staking::Config for Runtime {
+    type WeightInfo = pallet_agent_staking::weights::SubstrateWeight<Runtime>;
+    type IdentityProvider = IdentityCore;
+    type Currency = Balances;
+    type RuntimeHoldReason = RuntimeHoldReason;
+    type ReleaseBlockOrigin = EnsureRoot<AccountId>;
+    type UnbondingPeriod = AgentStakeUnbondingPeriod;
+    type MaxReasonCidLen = IdentityMaxCidLen;
+    type MaxReasonUriLen = IdentityMaxUriLen;
 }
 
 pub struct GuardianMembershipManager;
@@ -439,6 +451,8 @@ mod runtime {
     #[runtime::pallet_index(52)]
     pub type OnboardingDistribution = pallet_onboarding_distribution;
     #[runtime::pallet_index(53)]
+    pub type AgentStaking = pallet_agent_staking;
+    #[runtime::pallet_index(54)]
     pub type ViblyEmergency = pallet_vibly_emergency;
 }
 

@@ -8434,6 +8434,24 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-agent-staking"
+version = "0.1.0"
+dependencies = [
+ "pallet-balances",
+ "pallet-identity-core",
+ "pallet-onboarding-distribution",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "polkadot-sdk-frame",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "vibly-primitives-common",
+ "vibly-primitives-identity",
+]
+
+[[package]]
 name = "pallet-alliance"
 version = "44.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -19215,6 +19233,7 @@ name = "vibly-solo-runtime"
 version = "0.1.0"
 dependencies = [
  "log",
+ "pallet-agent-staking",
  "pallet-identity-core",
  "pallet-onboarding-distribution",
  "pallet-payment-intent",
