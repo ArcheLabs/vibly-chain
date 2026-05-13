@@ -1,119 +1,116 @@
 # vibly-chain
 
-vibly-chain 是基于 Polkadot SDK 构建的 Vibly 协调链。包含两个运行模式：
+`vibly-chain` is the Vibly coordination chain built on the [Polkadot SDK](https://github.com/paritytech/polkadot-sdk). It provides two runtime configurations:
 
-- **Parachain 模式**（`node/` + `runtime/`）：作为 Rococo/Paseo 的平行链运行，专注于身份根、内容指针、外部传输绑定和原生资产支付意图。
-- **Solo-node 模式**（`solo-node/` + `solo-runtime/`）：独立开发链，内置 **Guardian 紧急治理**（pallet-membership + pallet-collective + pallet-vibly-emergency），用于本地支付意图和紧急暂停功能开发和测试。
-
-`vibly-coordinator` 通过 REST/SSE API 消费链上事件，`vibly-indexer` 可索引链上状态变更。
-
-## 运行时对比
-
-| 特性 | Parachain runtime | Solo runtime |
+| Configuration | Binary | Default RPC |
 |---|---|---|
-| OpenGov（pallet_referenda）| ❌ | ❌ |
-| ConvictionVoting | ❌ | ❌ |
-| 身份核心（pallet-identity-core）| ✅ | ✅ |
-| 支付意图（pallet-payment-intent）| ✅ | ✅ |
-| Guardian 紧急治理（pallet-vibly-emergency）| ❌ | ✅ |
-| 默认 RPC 端口 | 9988 | **9944** |
+| **Parachain** (`node/` + `runtime/`) | `vibly-chain-node` | 9988 |
+| **Solo-node** (`solo-node/` + `solo-runtime/`) | `vibly-solo-node` | **9944** |
 
-## Parachain 范畴（`runtime/`）
+The solo-node is the primary target for local development and E2E testing with `vibly-coordinator` and `vibly-indexer`.
 
-- `pallet-identity-core`：根身份、恢复账号、委托密钥、内容指针、外部传输绑定。
-- `pallet-payment-intent`：原生资产（asset_id=0）支付意图，支持直接结算和锁定资金结算。
-- `primitives/*`：SCALE 共享类型。
+## Pallets
 
-## Solo-node Guardian 紧急治理（`solo-runtime/`）
+### Shared (parachain + solo-node)
 
-v0.2 solo-runtime 专注于 Guardian 紧急暂停机制：
+| Pallet | Description |
+|---|---|
+| `pallet-identity-core` | Root identity, recovery accounts, delegate keys, content pointers, external transport bindings |
+| `pallet-payment-intent` | Native-asset (asset\_id=0) payment intents with direct and hold-based settlement |
 
-- `pallet-identity-core`：根身份、恢复账号、委托密钥、内容指针、外部传输绑定。
-- `pallet-payment-intent`：原生资产（asset_id=0）支付意图，支持直接结算和锁定资金结算。
-- `pallet-membership`（GuardianMembership）：Guardian 成员管理，单个 Guardian 可暂停提案。
-- `pallet-collective`（GuardianCollective）：Guardian 集体，2/3 多数可取消或恢复暂停状态。
-- `pallet-vibly-emergency`：紧急暂停/恢复/取消接口，源于 Guardian 成员或集体 Origin。
+### Solo-node only
 
-> **注意：** OpenGov（pallet_referenda / ConvictionVoting / Treasury 等）已在 v0.2 中从 solo-runtime 移除。
-> Vibly 的提案/投票/审查流程是 Coordinator 侧领域模型，链上仅记录最终支付/惩罚/暂停事实。
+| Pallet | Description |
+|---|---|
+| `pallet-onboarding-distribution` | Agent registration, registrar assignment |
+| `pallet-agent-staking` | Agent stake bonding, unbonding, release-block mechanism |
+| `pallet-membership` (GuardianMembership) | Guardian member management; a single Guardian member can pause a proposal |
+| `pallet-collective` (GuardianCollective) | Guardian collective; 2/3 majority can cancel or restore a pause |
+| `pallet-vibly-emergency` | Emergency pause / resume / cancel interface for Guardian member or collective origins |
 
-默认 WebSocket 端点：`ws://127.0.0.1:9944`
+> OpenGov (`pallet_referenda`, `ConvictionVoting`, Treasury) is not included in the solo runtime. Vibly's proposal/voting/review flows are modelled as coordinator-side domain events; only final payment/penalty/pause facts are recorded on-chain.
 
-## 前置条件
+## Prerequisites
 
-- Rust toolchain（见 `rust-toolchain.toml`）
-- `wasm32-unknown-unknown` target（由 rustup 自动安装）
-- Zombienet CLI（多节点测试）：`npm install -g @zombienet/cli && zombienet setup polkadot`
+- Rust toolchain (see `rust-toolchain.toml`)
+- `wasm32-unknown-unknown` target (installed automatically by rustup)
+- [Zombienet CLI](https://github.com/paritytech/zombienet) for multi-node tests: `npm install -g @zombienet/cli && zombienet setup polkadot`
 
-## 常用命令
+## Build
 
 ```bash
-# 格式检查 & Lint
+# Format check and lint
 cargo fmt --check
 cargo clippy --workspace --all-targets -- -D warnings
 
-# 运行测试
+# Unit tests
 cargo test --workspace --exclude vibly-chain-node -j1
 
-# 构建 parachain node
+# Build parachain collator
 cargo build --release -p vibly-chain-node
 
-# 构建 solo-node（Guardian 开发链）
+# Build solo-node (local development and E2E)
 cargo build --release -p vibly-solo-node
 ```
 
-## Solo-node 开发链（Guardian 本地测试）
+## Solo-node: local development
 
 ```bash
-# 构建并启动 solo-node（--dev 模式，自动清空状态）
 cargo build --release -p vibly-solo-node
-./target/release/vibly-solo-node --dev
-
-# 默认 RPC：ws://127.0.0.1:9944
-# 可用 Polkadot.js Apps 连接：https://polkadot.js.org/apps/?rpc=ws://127.0.0.1:9944
+./target/release/vibly-solo-node --dev --tmp
+# WebSocket: ws://127.0.0.1:9944
+# Polkadot.js Apps: https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944
 ```
 
-启动后，配合 `vibly-coordinator` 即可处理支付意图和紧急暂停事件：
+With external RPC access (required for Docker-based indexer):
+
+```bash
+./target/release/vibly-solo-node --dev --tmp --rpc-external --rpc-cors all
+```
+
+Pair with the coordinator:
 
 ```bash
 cd ../vibly-coordinator && pnpm dev
 ```
 
-## Parachain 本地网络（Zombienet）
+## Parachain: local network (Zombienet)
 
 ```bash
 ./scripts/dev/build.sh
 ./scripts/dev/zombienet-local.sh
 ```
 
-生成开发链规格：
+Generate a dev chain spec:
 
 ```bash
 ./scripts/dev/chain-spec.sh
 ```
 
-## Paseo 测试网部署
+## Paseo testnet deployment
 
 ```bash
 ./scripts/paseo/build-artifacts.sh
-# 详见 scripts/paseo/README.md
+# see scripts/paseo/README.md for upload and collator setup
 ```
 
-## 仓库结构
+## Repository structure
 
-| 目录 | 内容 |
+| Directory | Contents |
 |---|---|
-| `node/` | Parachain collator CLI、链规格、RPC、服务 |
-| `runtime/` | Parachain runtime（身份 + 支付）|
+| `node/` | Parachain collator CLI, chain spec, RPC, services |
+| `runtime/` | Parachain runtime (identity + payment) |
 | `solo-node/` | Solo-node CLI |
-| `solo-runtime/` | Solo runtime（Guardian 紧急治理）|
-| `pallets/identity-core/` | 身份状态机 pallet |
-| `pallets/payment-intent/` | 支付意图状态机 pallet |
-| `primitives/` | 共享 SCALE 类型 |
-| `integration-tests/` | Zombienet 本地网络测试 |
-| `scripts/dev/` | 本地构建和链规格工具 |
-| `scripts/paseo/` | 测试网构件和 collator 工具 |
+| `solo-runtime/` | Solo runtime (identity + payment + agent staking + Guardian emergency) |
+| `pallets/identity-core/` | Identity state machine pallet |
+| `pallets/payment-intent/` | Payment intent state machine pallet |
+| `pallets/agent-staking/` | Agent stake bonding and release-block pallet |
+| `pallets/onboarding-distribution/` | Agent registration and registrar assignment pallet |
+| `primitives/` | Shared SCALE types |
+| `integration-tests/` | Zombienet local network tests |
+| `scripts/dev/` | Local build and chain spec tooling |
+| `scripts/paseo/` | Testnet artefacts and collator tooling |
 
-## 贡献
+## Contributing
 
-详见 `CONTRIBUTING.md`。安全问题请通过 `SECURITY.md` 报告。
+See [CONTRIBUTING.md](CONTRIBUTING.md). Report security issues via [SECURITY.md](SECURITY.md).
