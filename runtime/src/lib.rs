@@ -313,6 +313,8 @@ mod runtime {
     pub type IdentityCore = pallet_identity_core;
     #[runtime::pallet_index(51)]
     pub type PaymentIntent = pallet_payment_intent;
+    #[runtime::pallet_index(52)]
+    pub type VibClaim = pallet_vib_claim;
 }
 
 #[docify::export(register_validate_block)]

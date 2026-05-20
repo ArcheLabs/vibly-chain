@@ -10620,6 +10620,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-vib-claim"
+version = "0.1.0"
+dependencies = [
+ "pallet-balances",
+ "parity-scale-codec",
+ "polkadot-sdk-frame",
+ "scale-info",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "vibly-primitives-common",
+]
+
+[[package]]
 name = "pallet-vibly-emergency"
 version = "0.1.0"
 dependencies = [
@@ -19168,6 +19182,7 @@ dependencies = [
  "log",
  "pallet-identity-core",
  "pallet-payment-intent",
+ "pallet-vib-claim",
  "parity-scale-codec",
  "polkadot-sdk",
  "scale-info",
@@ -19237,6 +19252,7 @@ dependencies = [
  "pallet-identity-core",
  "pallet-onboarding-distribution",
  "pallet-payment-intent",
+ "pallet-vib-claim",
  "pallet-vibly-emergency",
  "parity-scale-codec",
  "polkadot-sdk",

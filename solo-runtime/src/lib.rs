@@ -312,6 +312,20 @@ impl pallet_agent_staking::Config for Runtime {
     type MaxReasonUriLen = IdentityMaxUriLen;
 }
 
+parameter_types! {
+    pub ClaimReserveAccount: AccountId = AccountId::new([7u8; 32]);
+}
+
+impl pallet_vib_claim::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type AdminOrigin = EnsureRoot<AccountId>;
+    type ClaimReserveAccount = ClaimReserveAccount;
+    type MaxNetworkIdLen = ConstU32<64>;
+    type MaxIdentityIdLen = ConstU32<128>;
+    type MaxProofLen = ConstU32<64>;
+}
+
 pub struct GuardianMembershipManager;
 impl SortedMembers<AccountId> for GuardianMembershipManager {
     fn sorted_members() -> Vec<AccountId> {
@@ -454,6 +468,8 @@ mod runtime {
     pub type AgentStaking = pallet_agent_staking;
     #[runtime::pallet_index(54)]
     pub type ViblyEmergency = pallet_vibly_emergency;
+    #[runtime::pallet_index(55)]
+    pub type VibClaim = pallet_vib_claim;
 }
 
 pub fn guardian_scope(id: u64) -> EmergencyScope {

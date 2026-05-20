@@ -371,3 +371,17 @@ impl pallet_payment_intent::Config for Runtime {
     type MaxCidLen = IdentityMaxCidLen;
     type MaxUriLen = IdentityMaxUriLen;
 }
+
+parameter_types! {
+    pub ClaimReserveAccount: AccountId = AccountId::new([7u8; 32]);
+}
+
+impl pallet_vib_claim::Config for Runtime {
+    type RuntimeEvent = RuntimeEvent;
+    type Currency = Balances;
+    type AdminOrigin = EnsureRoot<AccountId>;
+    type ClaimReserveAccount = ClaimReserveAccount;
+    type MaxNetworkIdLen = ConstU32<64>;
+    type MaxIdentityIdLen = ConstU32<128>;
+    type MaxProofLen = ConstU32<64>;
+}

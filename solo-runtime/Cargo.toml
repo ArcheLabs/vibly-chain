@@ -27,6 +27,7 @@ pallet-agent-staking.workspace = true
 pallet-onboarding-distribution.workspace = true
 pallet-payment-intent.workspace = true
 pallet-vibly-emergency.workspace = true
+pallet-vib-claim.workspace = true
 polkadot-sdk = { workspace = true, features = [
   "frame-metadata-hash-extension",
   "frame-system-rpc-runtime-api",
@@ -61,6 +62,7 @@ runtime-benchmarks = [
   "pallet-onboarding-distribution/runtime-benchmarks",
   "pallet-payment-intent/runtime-benchmarks",
   "pallet-vibly-emergency/runtime-benchmarks",
+  "pallet-vib-claim/runtime-benchmarks",
   "polkadot-sdk/runtime-benchmarks",
 ]
 std = [
@@ -71,6 +73,7 @@ std = [
   "pallet-onboarding-distribution/std",
   "pallet-payment-intent/std",
   "pallet-vibly-emergency/std",
+  "pallet-vib-claim/std",
   "polkadot-sdk/std",
   "scale-info/std",
   "serde_json/std",
@@ -85,5 +88,6 @@ try-runtime = [
   "pallet-onboarding-distribution/try-runtime",
   "pallet-payment-intent/try-runtime",
   "pallet-vibly-emergency/try-runtime",
+  "pallet-vib-claim/try-runtime",
   "polkadot-sdk/try-runtime",
 ]
