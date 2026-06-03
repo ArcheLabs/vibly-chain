@@ -35,13 +35,33 @@ pub mod pallet {
         pub updated_at: BlockNumber,
     }
 
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        Eq,
+        PartialEq,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     pub enum ProofPosition {
         Left,
         Right,
     }
 
-    #[derive(Clone, Encode, Decode, DecodeWithMemTracking, Eq, PartialEq, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        Eq,
+        PartialEq,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     pub struct MerkleProofItem {
         pub position: ProofPosition,
         pub hash: [u8; 32],
@@ -87,6 +107,9 @@ pub mod pallet {
     #[pallet::storage]
     pub type ClaimPaused<T: Config> = StorageValue<_, bool, ValueQuery>;
 
+    #[pallet::storage]
+    pub type ClaimRootPublisher<T: Config> = StorageValue<_, T::AccountId, OptionQuery>;
+
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
@@ -104,7 +127,12 @@ pub mod pallet {
             cumulative_amount: Amount,
             claimed_delta: Amount,
         },
-        ClaimPausedUpdated { paused: bool },
+        ClaimPausedUpdated {
+            paused: bool,
+        },
+        ClaimRootPublisherUpdated {
+            publisher: Option<T::AccountId>,
+        },
     }
 
     #[pallet::error]
@@ -131,9 +159,12 @@ pub mod pallet {
             total_cumulative_amount: Amount,
             metadata_hash: [u8; 32],
         ) -> DispatchResult {
-            T::AdminOrigin::ensure_origin(origin).map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
+            Self::ensure_root_update_origin(origin)?;
             if let Some(current) = ClaimRoot::<T>::get() {
-                ensure!(root_version > current.root_version, Error::<T>::InvalidRootVersion);
+                ensure!(
+                    root_version > current.root_version,
+                    Error::<T>::InvalidRootVersion
+                );
             }
             let info = RootInfo {
                 network_id: network_id.clone(),
@@ -168,17 +199,28 @@ pub mod pallet {
             ensure!(!ClaimPaused::<T>::get(), Error::<T>::ClaimPaused);
             let root = ClaimRoot::<T>::get().ok_or(Error::<T>::ClaimRootNotSet)?;
             ensure!(root.network_id == network_id, Error::<T>::InvalidNetworkId);
-            ensure!(root.root_version == root_version, Error::<T>::InvalidRootVersion);
+            ensure!(
+                root.root_version == root_version,
+                Error::<T>::InvalidRootVersion
+            );
             let leaf = Self::hash_leaf(&who, &identity_id, cumulative_amount);
             let computed = Self::apply_proof(leaf, proof);
             ensure!(computed == root.merkle_root, Error::<T>::InvalidMerkleProof);
 
             let already_claimed = ClaimedAmount::<T>::get(&who);
-            ensure!(cumulative_amount > already_claimed, Error::<T>::NothingToClaim);
+            ensure!(
+                cumulative_amount > already_claimed,
+                Error::<T>::NothingToClaim
+            );
             let delta = cumulative_amount
                 .checked_sub(already_claimed)
                 .ok_or(Error::<T>::AmountOverflow)?;
-            T::Currency::transfer(&T::ClaimReserveAccount::get(), &who, delta, Preservation::Expendable)?;
+            T::Currency::transfer(
+                &T::ClaimReserveAccount::get(),
+                &who,
+                delta,
+                Preservation::Expendable,
+            )?;
             ClaimedAmount::<T>::insert(&who, cumulative_amount);
             Self::deposit_event(Event::VibClaimed {
                 account_id: who,
@@ -193,14 +235,46 @@ pub mod pallet {
         #[pallet::call_index(2)]
         #[pallet::weight(10_000)]
         pub fn set_claim_paused(origin: OriginFor<T>, paused: bool) -> DispatchResult {
-            T::AdminOrigin::ensure_origin(origin).map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
+            T::AdminOrigin::ensure_origin(origin)
+                .map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
             ClaimPaused::<T>::put(paused);
             Self::deposit_event(Event::ClaimPausedUpdated { paused });
+            Ok(())
+        }
+
+        #[pallet::call_index(3)]
+        #[pallet::weight(10_000)]
+        pub fn set_claim_root_publisher(
+            origin: OriginFor<T>,
+            publisher: Option<T::AccountId>,
+        ) -> DispatchResult {
+            T::AdminOrigin::ensure_origin(origin)
+                .map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
+            match publisher.clone() {
+                Some(account) => ClaimRootPublisher::<T>::put(account),
+                None => ClaimRootPublisher::<T>::kill(),
+            }
+            Self::deposit_event(Event::ClaimRootPublisherUpdated { publisher });
             Ok(())
         }
     }
 
     impl<T: Config> Pallet<T> {
+        fn ensure_root_update_origin(origin: OriginFor<T>) -> DispatchResult {
+            match T::AdminOrigin::try_origin(origin) {
+                Ok(_) => Ok(()),
+                Err(origin) => {
+                    let who =
+                        ensure_signed(origin).map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
+                    ensure!(
+                        ClaimRootPublisher::<T>::get().as_ref() == Some(&who),
+                        Error::<T>::UnauthorizedRootUpdate
+                    );
+                    Ok(())
+                }
+            }
+        }
+
         pub fn hash_leaf(
             account_id: &T::AccountId,
             identity_id: &BoundedIdentityIdOf<T>,

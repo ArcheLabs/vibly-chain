@@ -27,6 +27,7 @@
 | `pallet-membership`（GuardianMembership） | 守护者成员管理；单个守护者成员即可暂停提案 |
 | `pallet-collective`（GuardianCollective） | 守护者集体；2/3 多数可取消或恢复暂停 |
 | `pallet-vibly-emergency` | 守护者成员或集体发起的紧急暂停/恢复/取消接口 |
+| `pallet-vib-claim` | Get VIB 累计 claim root；root 可设置/撤销专用 claim-root publisher 热号，该热号只能提交 `set_claim_root` |
 
 > 单节点运行时不包含 OpenGov（`pallet_referenda`、`ConvictionVoting`、Treasury）。Vibly 的提案/投票/审核流程以协调器侧领域事件建模；只有最终的支付/惩罚/暂停事实才记录在链上。
 

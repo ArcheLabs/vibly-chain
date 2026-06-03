@@ -27,6 +27,7 @@ The solo-node is the primary target for local development and E2E testing with `
 | `pallet-membership` (GuardianMembership) | Guardian member management; a single Guardian member can pause a proposal |
 | `pallet-collective` (GuardianCollective) | Guardian collective; 2/3 majority can cancel or restore a pause |
 | `pallet-vibly-emergency` | Emergency pause / resume / cancel interface for Guardian member or collective origins |
+| `pallet-vib-claim` | Cumulative Get VIB claim roots; root can set/revoke a dedicated claim-root publisher hot key, and that publisher can only submit `set_claim_root` |
 
 > OpenGov (`pallet_referenda`, `ConvictionVoting`, Treasury) is not included in the solo runtime. Vibly's proposal/voting/review flows are modelled as coordinator-side domain events; only final payment/penalty/pause facts are recorded on-chain.
 
