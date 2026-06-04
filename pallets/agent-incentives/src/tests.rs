@@ -4,11 +4,11 @@ use super::{
         RuntimeEvent, RuntimeOrigin, System, Test, REWARD_RESERVE,
     },
     AgentRef, AgentRewardLedgers, DailyEmissionStates, DifficultyRewardSchedule, Error,
-    RewardConfig, TaskDifficulty,
+    RewardConfig, RewardCreditKind, TaskDifficulty,
 };
 use frame::deps::frame_support::{assert_noop, assert_ok};
 use vibly_primitives_common::ContentRef;
-use vibly_primitives_identity::IdentityId;
+use vibly_primitives_identity::{IdentityId, KeyPurpose, CAP_MANAGE_PAYMENT};
 
 const BASE_UNIT: u128 = 1_000;
 
@@ -124,6 +124,16 @@ fn base_staking_settlement_and_claim_flow_work() {
         let ledger = AgentRewardLedgers::<Test>::get((identity_id, agent_id));
         assert_eq!(ledger.claimable_base, 82);
         assert_eq!(ledger.claimable_total, 82);
+        assert!(System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::AgentIncentives(super::Event::AgentRewardCredited {
+                identity_id: event_identity_id,
+                agent_id: event_agent_id,
+                day_index: 0,
+                kind: RewardCreditKind::Base,
+                amount: 82,
+            }) if event_identity_id == identity_id && event_agent_id == agent_id
+        )));
 
         assert_ok!(AgentIncentives::claim_agent_rewards(
             RuntimeOrigin::signed(1),
@@ -137,6 +147,59 @@ fn base_staking_settlement_and_claim_flow_work() {
         assert_eq!(updated.claimed_base, 82);
         assert_eq!(Balances::free_balance(1), before_owner_balance + 82);
         assert_eq!(Balances::free_balance(REWARD_RESERVE), before_reserve_balance - 82);
+    });
+}
+
+#[test]
+fn payment_capability_key_can_claim_but_other_keys_cannot() {
+    new_test_ext().execute_with(|| {
+        let (identity_id, agent_id) = register_identity_and_agent(1, b"agent-payment-key");
+        bond_agent(1, identity_id, agent_id, 100_000);
+
+        assert_ok!(IdentityCore::add_key(
+            RuntimeOrigin::signed(1),
+            identity_id,
+            2,
+            KeyPurpose::Finance,
+            CAP_MANAGE_PAYMENT,
+            None,
+        ));
+        assert_ok!(IdentityCore::add_key(
+            RuntimeOrigin::signed(1),
+            identity_id,
+            3,
+            KeyPurpose::Session,
+            0,
+            None,
+        ));
+
+        assert_ok!(AgentIncentives::set_reward_config(
+            RuntimeOrigin::root(),
+            reward_config(),
+        ));
+        assert_ok!(AgentIncentives::set_reward_settlement_publisher(
+            RuntimeOrigin::root(),
+            Some(99),
+        ));
+        assert_ok!(AgentIncentives::settle_base_staking_day(
+            RuntimeOrigin::signed(99),
+            0,
+            vec![AgentRef { identity_id, agent_id }].try_into().unwrap(),
+        ));
+
+        assert_noop!(
+            AgentIncentives::claim_agent_rewards(
+                RuntimeOrigin::signed(3),
+                identity_id,
+                agent_id,
+            ),
+            pallet_identity_core::Error::<Test>::Unauthorized
+        );
+        assert_ok!(AgentIncentives::claim_agent_rewards(
+            RuntimeOrigin::signed(2),
+            identity_id,
+            agent_id,
+        ));
     });
 }
 
@@ -170,9 +233,12 @@ fn settlement_publisher_is_enforced() {
 fn observer_and_task_caps_are_applied() {
     new_test_ext().execute_with(|| {
         let mut config = reward_config();
-        config.observer_reviewer_pool = 365_000;
-        config.task_market_pool = 365_000;
-        config.agent_daily_total_protocol_reward_cap = 1_500;
+		config.observer_reviewer_pool = 365_000;
+		config.task_market_pool = 365_000;
+		config.auto_emission_pool =
+			config.base_staking_pool + config.observer_reviewer_pool + config.task_market_pool;
+		config.total_reward_pool = config.auto_emission_pool + config.reserve_pool;
+		config.agent_daily_total_protocol_reward_cap = 1_500;
         config.agent_daily_task_reward_cap = 2_000;
         config.task_max_subsidy = 2_000;
         config.difficulty_schedule.critical = 2_000;
@@ -294,6 +360,88 @@ fn day_state_rollover_is_recorded() {
             day_one.base_staking_budget,
             (config.base_staking_pool / config.planned_emission_days as u128)
                 + day_zero.rollover_base_staking
+        );
+    });
+}
+
+#[test]
+fn reward_days_must_be_settled_in_sequence() {
+    new_test_ext().execute_with(|| {
+        let mut config = reward_config();
+        config.emission_start_day = 10;
+        assert_ok!(AgentIncentives::set_reward_config(
+            RuntimeOrigin::root(),
+            config,
+        ));
+        assert_ok!(AgentIncentives::set_reward_settlement_publisher(
+            RuntimeOrigin::root(),
+            Some(99),
+        ));
+
+        let (identity_id, agent_id) = register_identity_and_agent(1, b"agent-day-sequence");
+        bond_agent(1, identity_id, agent_id, 1_000);
+        let participants = || vec![AgentRef { identity_id, agent_id }].try_into().unwrap();
+
+        assert_noop!(
+            AgentIncentives::settle_base_staking_day(RuntimeOrigin::signed(99), 9, participants()),
+            Error::<Test>::RewardEmissionEnded
+        );
+        assert_noop!(
+            AgentIncentives::settle_base_staking_day(RuntimeOrigin::signed(99), 11, participants()),
+            Error::<Test>::PreviousRewardDayMissing
+        );
+        assert_ok!(AgentIncentives::settle_base_staking_day(
+            RuntimeOrigin::signed(99),
+            10,
+            participants(),
+        ));
+    });
+}
+
+#[test]
+fn reward_emission_end_is_enforced() {
+    new_test_ext().execute_with(|| {
+        let mut config = reward_config();
+        config.planned_emission_days = 1;
+        assert_ok!(AgentIncentives::set_reward_config(
+            RuntimeOrigin::root(),
+            config,
+        ));
+        assert_ok!(AgentIncentives::set_reward_settlement_publisher(
+            RuntimeOrigin::root(),
+            Some(99),
+        ));
+
+        let (identity_id, agent_id) = register_identity_and_agent(1, b"agent-ended");
+        bond_agent(1, identity_id, agent_id, 1_000);
+        assert_noop!(
+            AgentIncentives::settle_task_reward(
+                RuntimeOrigin::signed(99),
+                b"task-ended".to_vec().try_into().unwrap(),
+                1,
+                AgentRef { identity_id, agent_id },
+                TaskDifficulty::Easy,
+            ),
+            Error::<Test>::RewardEmissionEnded
+        );
+    });
+}
+
+#[test]
+fn invalid_pool_config_is_rejected() {
+    new_test_ext().execute_with(|| {
+        let mut config = reward_config();
+        config.task_market_pool = config.task_market_pool.saturating_sub(1);
+        assert_noop!(
+            AgentIncentives::set_reward_config(RuntimeOrigin::root(), config),
+            Error::<Test>::InvalidRewardConfig
+        );
+
+        let mut config = reward_config();
+        config.reviewer_share_bps = 3_000;
+        assert_noop!(
+            AgentIncentives::set_reward_config(RuntimeOrigin::root(), config),
+            Error::<Test>::InvalidRewardConfig
         );
     });
 }

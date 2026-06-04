@@ -82,6 +82,27 @@ pub mod pallet {
         Default,
         Eq,
         PartialEq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
+    pub enum RewardCreditKind {
+        #[default]
+        Base,
+        Observer,
+        Reviewer,
+        Task,
+    }
+
+    #[derive(
+        Clone,
+        Copy,
+        Default,
+        Eq,
+        PartialEq,
         Ord,
         PartialOrd,
         Encode,
@@ -393,6 +414,13 @@ pub mod pallet {
             released: Amount,
             remaining_budget: Amount,
         },
+        AgentRewardCredited {
+            identity_id: IdentityId,
+            agent_id: Hash256,
+            day_index: u32,
+            kind: RewardCreditKind,
+            amount: Amount,
+        },
         AgentRewardClaimed {
             identity_id: IdentityId,
             agent_id: Hash256,
@@ -412,6 +440,8 @@ pub mod pallet {
         IdentityOwnerMissing,
         ArithmeticOverflow,
         InvalidRewardConfig,
+        PreviousRewardDayMissing,
+        RewardEmissionEnded,
     }
 
     #[pallet::call]
@@ -474,8 +504,8 @@ pub mod pallet {
             Self::distribute_rewards(
                 &weights,
                 released,
-                RewardKind::Base,
-                None,
+                RewardCreditKind::Base,
+                Some(day_index),
             )?;
 
             state.base_staking_released = state
@@ -634,7 +664,7 @@ pub mod pallet {
                 .min(config.agent_daily_total_protocol_reward_cap.saturating_sub(usage.total_protocol_amount));
 
             if reward != 0u128 {
-                Self::credit_reward(executor.identity_id, executor.agent_id, reward, RewardKind::Task, Some(day_index))?;
+                Self::credit_reward(executor.identity_id, executor.agent_id, reward, RewardCreditKind::Task, Some(day_index))?;
                 state.task_market_released = state
                     .task_market_released
                     .checked_add(reward)
@@ -731,14 +761,6 @@ pub mod pallet {
         }
     }
 
-    #[derive(Clone, Copy)]
-    enum RewardKind {
-        Base,
-        Observer,
-        Reviewer,
-        Task,
-    }
-
     impl<T: Config> Pallet<T> {
         fn reward_config() -> Result<RewardConfig, DispatchError> {
             RewardConfigs::<T>::get().ok_or(Error::<T>::RewardConfigNotSet.into())
@@ -748,9 +770,20 @@ pub mod pallet {
             ensure!(config.planned_emission_days > 0, Error::<T>::InvalidRewardConfig);
             ensure!(config.round_duration_seconds > 0, Error::<T>::InvalidRewardConfig);
             ensure!(
-                config.observer_share_bps.saturating_add(config.reviewer_share_bps) <= BPS_DENOMINATOR as u32,
+                config.observer_share_bps.saturating_add(config.reviewer_share_bps) == BPS_DENOMINATOR as u32,
                 Error::<T>::InvalidRewardConfig,
             );
+            let automatic = config
+                .base_staking_pool
+                .checked_add(config.observer_reviewer_pool)
+                .and_then(|value| value.checked_add(config.task_market_pool))
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
+            ensure!(automatic == config.auto_emission_pool, Error::<T>::InvalidRewardConfig);
+            let total = config
+                .auto_emission_pool
+                .checked_add(config.reserve_pool)
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
+            ensure!(total == config.total_reward_pool, Error::<T>::InvalidRewardConfig);
             Ok(())
         }
 
@@ -767,14 +800,21 @@ pub mod pallet {
             if let Some(existing) = DailyEmissionStates::<T>::get(day_index) {
                 return Ok(existing);
             }
+            ensure!(day_index >= config.emission_start_day, Error::<T>::RewardEmissionEnded);
+            let last_planned_day = config
+                .emission_start_day
+                .checked_add(config.planned_emission_days.saturating_sub(1))
+                .ok_or(Error::<T>::ArithmeticOverflow)?;
+            ensure!(day_index <= last_planned_day, Error::<T>::RewardEmissionEnded);
 
             let base_daily = config.base_staking_pool / config.planned_emission_days as Amount;
             let observer_daily = config.observer_reviewer_pool / config.planned_emission_days as Amount;
             let task_daily = config.task_market_pool / config.planned_emission_days as Amount;
-            let previous = if day_index == 0 {
+            let previous = if day_index == config.emission_start_day {
                 None
             } else {
-                Some(Self::ensure_day_state(day_index - 1, config)?)
+                Some(DailyEmissionStates::<T>::get(day_index.saturating_sub(1))
+                    .ok_or(Error::<T>::PreviousRewardDayMissing)?)
             };
             let state = DailyEmissionState {
                 day_index,
@@ -854,8 +894,8 @@ pub mod pallet {
                 .saturating_sub(state.observer_reviewer_released);
             let allocatable = min(planned_round_budget, remaining_budget);
             let kind = match role {
-                RoundRole::Observer => RewardKind::Observer,
-                RoundRole::Reviewer => RewardKind::Reviewer,
+                RoundRole::Observer => RewardCreditKind::Observer,
+                RoundRole::Reviewer => RewardCreditKind::Reviewer,
             };
 
             let released = Self::distribute_rewards(weights, allocatable, kind, Some(day_index))?;
@@ -880,7 +920,7 @@ pub mod pallet {
         fn distribute_rewards(
             weights: &[(AgentRef, Amount)],
             allocatable: Amount,
-            kind: RewardKind,
+            kind: RewardCreditKind,
             day_index: Option<u32>,
         ) -> Result<Amount, DispatchError> {
             if allocatable == 0 || weights.is_empty() {
@@ -917,12 +957,12 @@ pub mod pallet {
             identity_id: IdentityId,
             agent_id: Hash256,
             reward: Amount,
-            kind: RewardKind,
+            kind: RewardCreditKind,
         ) -> Result<Amount, DispatchError> {
             let config = Self::reward_config()?;
             let usage = AgentDailyUsages::<T>::get((day_index, identity_id, agent_id));
             let capped = match kind {
-                RewardKind::Observer | RewardKind::Reviewer => reward
+                RewardCreditKind::Observer | RewardCreditKind::Reviewer => reward
                     .min(
                         config
                             .agent_daily_observer_reviewer_reward_cap
@@ -933,14 +973,14 @@ pub mod pallet {
                             .agent_daily_total_protocol_reward_cap
                             .saturating_sub(usage.total_protocol_amount),
                     ),
-                RewardKind::Task => reward
+                RewardCreditKind::Task => reward
                     .min(config.agent_daily_task_reward_cap.saturating_sub(usage.task_amount))
                     .min(
                         config
                             .agent_daily_total_protocol_reward_cap
                             .saturating_sub(usage.total_protocol_amount),
                     ),
-                RewardKind::Base => reward,
+                RewardCreditKind::Base => reward,
             };
             Ok(capped)
         }
@@ -949,7 +989,7 @@ pub mod pallet {
             identity_id: IdentityId,
             agent_id: Hash256,
             amount: Amount,
-            kind: RewardKind,
+            kind: RewardCreditKind,
             day_index: Option<u32>,
         ) -> DispatchResult {
             if amount == 0 {
@@ -962,25 +1002,25 @@ pub mod pallet {
                     .checked_add(amount)
                     .ok_or(Error::<T>::ArithmeticOverflow)?;
                 match kind {
-                    RewardKind::Base => {
+                    RewardCreditKind::Base => {
                         ledger.claimable_base = ledger
                             .claimable_base
                             .checked_add(amount)
                             .ok_or(Error::<T>::ArithmeticOverflow)?;
                     }
-                    RewardKind::Observer => {
+                    RewardCreditKind::Observer => {
                         ledger.claimable_observer = ledger
                             .claimable_observer
                             .checked_add(amount)
                             .ok_or(Error::<T>::ArithmeticOverflow)?;
                     }
-                    RewardKind::Reviewer => {
+                    RewardCreditKind::Reviewer => {
                         ledger.claimable_reviewer = ledger
                             .claimable_reviewer
                             .checked_add(amount)
                             .ok_or(Error::<T>::ArithmeticOverflow)?;
                     }
-                    RewardKind::Task => {
+                    RewardCreditKind::Task => {
                         ledger.claimable_task = ledger
                             .claimable_task
                             .checked_add(amount)
@@ -994,7 +1034,7 @@ pub mod pallet {
             if let Some(day) = day_index {
                 AgentDailyUsages::<T>::try_mutate((day, identity_id, agent_id), |usage| -> DispatchResult {
                     match kind {
-                        RewardKind::Observer | RewardKind::Reviewer => {
+                        RewardCreditKind::Observer | RewardCreditKind::Reviewer => {
                             usage.observer_reviewer_amount = usage
                                 .observer_reviewer_amount
                                 .checked_add(amount)
@@ -1004,7 +1044,7 @@ pub mod pallet {
                                 .checked_add(amount)
                                 .ok_or(Error::<T>::ArithmeticOverflow)?;
                         }
-                        RewardKind::Task => {
+                        RewardCreditKind::Task => {
                             usage.task_amount = usage
                                 .task_amount
                                 .checked_add(amount)
@@ -1014,10 +1054,19 @@ pub mod pallet {
                                 .checked_add(amount)
                                 .ok_or(Error::<T>::ArithmeticOverflow)?;
                         }
-                        RewardKind::Base => {}
+                        RewardCreditKind::Base => {}
                     }
                     Ok(())
                 })?;
+            }
+            if let Some(day) = day_index {
+                Self::deposit_event(Event::AgentRewardCredited {
+                    identity_id,
+                    agent_id,
+                    day_index: day,
+                    kind,
+                    amount,
+                });
             }
             Ok(())
         }
