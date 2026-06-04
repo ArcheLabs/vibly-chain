@@ -8434,6 +8434,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "pallet-agent-incentives"
+version = "0.1.0"
+dependencies = [
+ "pallet-agent-staking",
+ "pallet-balances",
+ "pallet-identity-core",
+ "pallet-onboarding-distribution",
+ "pallet-timestamp",
+ "parity-scale-codec",
+ "polkadot-sdk-frame",
+ "scale-info",
+ "serde",
+ "sp-core",
+ "sp-io",
+ "sp-runtime",
+ "vibly-primitives-common",
+ "vibly-primitives-identity",
+]
+
+[[package]]
 name = "pallet-agent-staking"
 version = "0.1.0"
 dependencies = [
@@ -19248,6 +19268,7 @@ name = "vibly-solo-runtime"
 version = "0.1.0"
 dependencies = [
  "log",
+ "pallet-agent-incentives",
  "pallet-agent-staking",
  "pallet-identity-core",
  "pallet-onboarding-distribution",

@@ -1,5 +1,6 @@
 use super::*;
 use frame_support::{assert_noop, assert_ok};
+use sp_runtime::traits::{BlakeTwo256, Hash};
 use pallet_vibly_emergency::{EmergencyStatus, Error as EmergencyError, StatusByScope};
 use sp_core::sr25519;
 use sp_runtime::{
@@ -22,10 +23,12 @@ fn new_test_ext() -> sp_io::TestExternalities {
         system: Default::default(),
         balances: pallet_balances::GenesisConfig {
             balances: vec![
-                (alice.clone(), 1_000 * UNIT),
-                (bob.clone(), 1_000 * UNIT),
-                (charlie.clone(), 1_000 * UNIT),
-                (dave, 1_000 * UNIT),
+                (alice.clone(), 1_000_000 * UNIT),
+                (bob.clone(), 1_000_000 * UNIT),
+                (charlie.clone(), 1_000_000 * UNIT),
+                (dave, 1_000_000 * UNIT),
+                (RewardReserveAccount::get(), 30_000_000 * UNIT),
+                (ClaimReserveAccount::get(), 30_000_000 * UNIT),
             ],
             ..Default::default()
         },
@@ -41,11 +44,15 @@ fn new_test_ext() -> sp_io::TestExternalities {
             ..Default::default()
         },
         guardian_membership: pallet_membership::GenesisConfig {
-            members: vec![alice, bob, charlie].try_into().unwrap(),
+            members: vec![alice, bob.clone(), charlie].try_into().unwrap(),
             ..Default::default()
         },
         guardian_collective: Default::default(),
         transaction_payment: Default::default(),
+        agent_incentives: pallet_agent_incentives::GenesisConfig {
+            reward_config: Some(genesis_config_presets::default_reward_config()),
+            reward_settlement_publisher: Some(bob.clone()),
+        },
     }
     .build_storage()
     .unwrap();
@@ -127,5 +134,67 @@ fn cancelled_proposal_cannot_resume() {
             ),
             EmergencyError::<Runtime>::AlreadyCancelled
         );
+    });
+}
+
+#[test]
+fn agent_incentives_runtime_flow_works() {
+    new_test_ext().execute_with(|| {
+        let alice = account(1);
+
+        assert_ok!(IdentityCore::register_identity(
+            RuntimeOrigin::signed(alice.clone()),
+            None,
+            None,
+            None,
+            None,
+            None,
+        ));
+        let identity_id = BlakeTwo256::hash_of(&(b"vibly/identity", 0u64));
+
+        assert_ok!(OnboardingDistribution::set_agent_registrar(
+            RuntimeOrigin::signed(alice.clone()),
+            identity_id,
+            alice.clone(),
+        ));
+        assert_ok!(OnboardingDistribution::register_agent(
+            RuntimeOrigin::signed(alice.clone()),
+            identity_id,
+            vibly_primitives_common::ContentRef::Cid(b"runtime-agent".to_vec().try_into().unwrap()),
+        ));
+        let agent_id = BlakeTwo256::hash_of(&(
+            b"vibly/agent",
+            identity_id,
+            &alice,
+            &vibly_primitives_common::ContentRef::<IdentityMaxCidLen, IdentityMaxUriLen>::Cid(
+                b"runtime-agent".to_vec().try_into().unwrap(),
+            ),
+        ));
+
+        assert_ok!(AgentStaking::bond_agent(
+            RuntimeOrigin::signed(alice.clone()),
+            identity_id,
+            agent_id,
+            100_000 * UNIT,
+        ));
+        assert_ok!(AgentIncentives::settle_base_staking_day(
+            RuntimeOrigin::signed(account(2)),
+            0,
+            vec![pallet_agent_incentives::AgentRef { identity_id, agent_id }]
+                .try_into()
+                .unwrap(),
+        ));
+
+        let ledger =
+            pallet_agent_incentives::AgentRewardLedgers::<Runtime>::get((identity_id, agent_id));
+        assert!(ledger.claimable_total > 0);
+
+        let before = Balances::free_balance(alice.clone());
+        assert_ok!(AgentIncentives::claim_agent_rewards(
+            RuntimeOrigin::signed(alice.clone()),
+            identity_id,
+            agent_id,
+        ));
+        assert!(Balances::free_balance(alice) > before);
     });
 }

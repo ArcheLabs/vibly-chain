@@ -23,6 +23,7 @@ workspace = true
 codec = { features = ["derive"], workspace = true }
 log = { workspace = true }
 pallet-identity-core.workspace = true
+pallet-agent-incentives.workspace = true
 pallet-agent-staking.workspace = true
 pallet-onboarding-distribution.workspace = true
 pallet-payment-intent.workspace = true
@@ -58,6 +59,7 @@ metadata-hash = ["substrate-wasm-builder/metadata-hash"]
 on-chain-release-build = ["metadata-hash"]
 runtime-benchmarks = [
   "pallet-identity-core/runtime-benchmarks",
+  "pallet-agent-incentives/runtime-benchmarks",
   "pallet-agent-staking/runtime-benchmarks",
   "pallet-onboarding-distribution/runtime-benchmarks",
   "pallet-payment-intent/runtime-benchmarks",
@@ -69,6 +71,7 @@ std = [
   "codec/std",
   "log/std",
   "pallet-identity-core/std",
+  "pallet-agent-incentives/std",
   "pallet-agent-staking/std",
   "pallet-onboarding-distribution/std",
   "pallet-payment-intent/std",
@@ -84,6 +87,7 @@ std = [
 ]
 try-runtime = [
   "pallet-identity-core/try-runtime",
+  "pallet-agent-incentives/try-runtime",
   "pallet-agent-staking/try-runtime",
   "pallet-onboarding-distribution/try-runtime",
   "pallet-payment-intent/try-runtime",

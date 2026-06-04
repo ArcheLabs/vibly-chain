@@ -314,6 +314,17 @@ impl pallet_agent_staking::Config for Runtime {
 
 parameter_types! {
     pub ClaimReserveAccount: AccountId = AccountId::new([7u8; 32]);
+    pub RewardReserveAccount: AccountId = AccountId::new([8u8; 32]);
+}
+
+impl pallet_agent_incentives::Config for Runtime {
+    type WeightInfo = pallet_agent_incentives::weights::SubstrateWeight<Runtime>;
+    type IdentityProvider = IdentityCore;
+    type Currency = Balances;
+    type AdminOrigin = EnsureRoot<AccountId>;
+    type RewardReserveAccount = RewardReserveAccount;
+    type MaxExternalIdLen = ConstU32<64>;
+    type MaxSettlementParticipants = ConstU32<128>;
 }
 
 impl pallet_vib_claim::Config for Runtime {
@@ -470,6 +481,8 @@ mod runtime {
     pub type ViblyEmergency = pallet_vibly_emergency;
     #[runtime::pallet_index(55)]
     pub type VibClaim = pallet_vib_claim;
+    #[runtime::pallet_index(56)]
+    pub type AgentIncentives = pallet_agent_incentives;
 }
 
 pub fn guardian_scope(id: u64) -> EmergencyScope {
@@ -646,6 +659,35 @@ pub mod genesis_config_presets {
     pub const DEV_RUNTIME_PRESET: &str = "development";
     pub const LOCAL_RUNTIME_PRESET: &str = "local_testnet";
 
+    pub fn default_reward_config() -> pallet_agent_incentives::RewardConfig {
+        pallet_agent_incentives::RewardConfig {
+            total_reward_pool: 30_000_000 * UNIT,
+            auto_emission_pool: 27_000_000 * UNIT,
+            base_staking_pool: 6_000_000 * UNIT,
+            observer_reviewer_pool: 12_000_000 * UNIT,
+            task_market_pool: 9_000_000 * UNIT,
+            reserve_pool: 3_000_000 * UNIT,
+            emission_start_day: 0,
+            planned_emission_days: 365,
+            min_stake: 1_000 * UNIT,
+            max_effective_stake: 500_000 * UNIT,
+            max_passive_apy_bps: 3_000,
+            round_duration_seconds: 3_600,
+            observer_share_bps: 6_000,
+            reviewer_share_bps: 4_000,
+            task_max_subsidy: 2_000 * UNIT,
+            agent_daily_observer_reviewer_reward_cap: 1_000 * UNIT,
+            agent_daily_task_reward_cap: 2_000 * UNIT,
+            agent_daily_total_protocol_reward_cap: 3_000 * UNIT,
+            difficulty_schedule: pallet_agent_incentives::DifficultyRewardSchedule {
+                easy: 250 * UNIT,
+                normal: 500 * UNIT,
+                hard: 1_000 * UNIT,
+                critical: 1_500 * UNIT,
+            },
+        }
+    }
+
     pub fn development_config(
         sudo: AccountId,
         aura: Vec<AuraId>,
@@ -653,16 +695,20 @@ pub mod genesis_config_presets {
         guardians: Vec<AccountId>,
         endowed_accounts: Vec<AccountId>,
     ) -> RuntimeGenesisConfig {
+        let mut balances: Vec<(AccountId, Balance)> = endowed_accounts
+            .into_iter()
+            .map(|account| (account, 1_000_000 * UNIT))
+            .collect();
+        balances.push((RewardReserveAccount::get(), 30_000_000 * UNIT));
+        balances.push((ClaimReserveAccount::get(), 30_000_000 * UNIT));
+
         RuntimeGenesisConfig {
             system: Default::default(),
             balances: pallet_balances::GenesisConfig {
-                balances: endowed_accounts
-                    .into_iter()
-                    .map(|account| (account, 1_000_000 * UNIT))
-                    .collect(),
+                balances,
                 ..Default::default()
             },
-            sudo: pallet_sudo::GenesisConfig { key: Some(sudo) },
+            sudo: pallet_sudo::GenesisConfig { key: Some(sudo.clone()) },
             aura: pallet_aura::GenesisConfig { authorities: aura },
             grandpa: pallet_grandpa::GenesisConfig {
                 authorities: grandpa.into_iter().map(|authority| (authority, 1)).collect(),
@@ -674,6 +720,10 @@ pub mod genesis_config_presets {
             },
             guardian_collective: Default::default(),
             transaction_payment: Default::default(),
+            agent_incentives: pallet_agent_incentives::GenesisConfig {
+                reward_config: Some(default_reward_config()),
+                reward_settlement_publisher: Some(sudo),
+            },
         }
     }
 
