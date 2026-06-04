@@ -226,6 +226,31 @@ fn invalid_network_or_proof_is_rejected() {
 }
 
 #[test]
+fn wrong_root_version_is_rejected() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(VibClaim::set_claim_root(
+            RuntimeOrigin::root(),
+            network_id(),
+            2,
+            root_for(1, 100),
+            100,
+            [2; 32]
+        ));
+        assert_noop!(
+            VibClaim::claim(
+                RuntimeOrigin::signed(1),
+                network_id(),
+                1,
+                identity_id(),
+                100,
+                empty_proof()
+            ),
+            Error::<Test>::InvalidRootVersion
+        );
+    });
+}
+
+#[test]
 fn paused_claims_are_rejected() {
     new_test_ext().execute_with(|| {
         assert_ok!(VibClaim::set_claim_root(
@@ -248,5 +273,35 @@ fn paused_claims_are_rejected() {
             ),
             Error::<Test>::ClaimPaused
         );
+    });
+}
+
+#[test]
+fn reserve_balance_shortfall_rejects_claim_without_marking_claimed() {
+    new_test_ext().execute_with(|| {
+        let cumulative = 1_000_001;
+        assert_ok!(VibClaim::set_claim_root(
+            RuntimeOrigin::root(),
+            network_id(),
+            1,
+            root_for(1, cumulative),
+            cumulative,
+            [1; 32]
+        ));
+        assert_noop!(
+            VibClaim::claim(
+                RuntimeOrigin::signed(1),
+                network_id(),
+                1,
+                identity_id(),
+                cumulative,
+                empty_proof()
+            ),
+            frame::deps::sp_runtime::DispatchError::Token(
+                frame::deps::sp_runtime::TokenError::FundsUnavailable,
+            )
+        );
+        assert_eq!(ClaimedAmount::<Test>::get(1), 0);
+        assert_eq!(Balances::free_balance(RESERVE), 1_000_000);
     });
 }
