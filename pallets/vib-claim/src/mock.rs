@@ -62,7 +62,7 @@ impl pallet_balances::Config for Test {
 }
 
 impl crate::Config for Test {
-    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = ();
     type Currency = Balances;
     type AdminOrigin = frame_system::EnsureRoot<u64>;
     type ClaimReserveAccount = ConstU64<RESERVE>;

@@ -377,7 +377,7 @@ parameter_types! {
 }
 
 impl pallet_vib_claim::Config for Runtime {
-    type RuntimeEvent = RuntimeEvent;
+    type WeightInfo = pallet_vib_claim::weights::SubstrateWeight<Runtime>;
     type Currency = Balances;
     type AdminOrigin = EnsureRoot<AccountId>;
     type ClaimReserveAccount = ClaimReserveAccount;

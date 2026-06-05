@@ -34,7 +34,7 @@
 ## 前置条件
 
 - Rust 工具链（参见 `rust-toolchain.toml`）
-- `wasm32-unknown-unknown` target（rustup 自动安装）
+- `wasm32v1-none` target（rustup 自动安装）
 - [Zombienet CLI](https://github.com/paritytech/zombienet)（用于多节点测试）：`npm install -g @zombienet/cli && zombienet setup polkadot`
 
 ## 构建

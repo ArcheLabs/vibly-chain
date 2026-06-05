@@ -7,10 +7,12 @@ pub use pallet::*;
 mod mock;
 #[cfg(test)]
 mod tests;
+pub mod weights;
 
 #[frame::pallet]
 pub mod pallet {
     use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
+    use crate::weights::WeightInfo;
     use frame::{
         prelude::*,
         traits::{
@@ -76,7 +78,7 @@ pub mod pallet {
 
     #[pallet::config]
     pub trait Config: frame_system::Config {
-        type RuntimeEvent: From<Event<Self>> + IsType<<Self as frame_system::Config>::RuntimeEvent>;
+        type WeightInfo: WeightInfo;
         type Currency: Mutate<Self::AccountId, Balance = Amount>;
         type AdminOrigin: EnsureOrigin<Self::RuntimeOrigin>;
         #[pallet::constant]
@@ -150,7 +152,7 @@ pub mod pallet {
     #[pallet::call]
     impl<T: Config> Pallet<T> {
         #[pallet::call_index(0)]
-        #[pallet::weight(10_000)]
+        #[pallet::weight(T::WeightInfo::set_claim_root())]
         pub fn set_claim_root(
             origin: OriginFor<T>,
             network_id: BoundedNetworkIdOf<T>,
@@ -186,7 +188,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(1)]
-        #[pallet::weight(10_000)]
+        #[pallet::weight(T::WeightInfo::claim())]
         pub fn claim(
             origin: OriginFor<T>,
             network_id: BoundedNetworkIdOf<T>,
@@ -233,7 +235,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(2)]
-        #[pallet::weight(10_000)]
+        #[pallet::weight(T::WeightInfo::set_claim_paused())]
         pub fn set_claim_paused(origin: OriginFor<T>, paused: bool) -> DispatchResult {
             T::AdminOrigin::ensure_origin(origin)
                 .map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
@@ -243,7 +245,7 @@ pub mod pallet {
         }
 
         #[pallet::call_index(3)]
-        #[pallet::weight(10_000)]
+        #[pallet::weight(T::WeightInfo::set_claim_root_publisher())]
         pub fn set_claim_root_publisher(
             origin: OriginFor<T>,
             publisher: Option<T::AccountId>,

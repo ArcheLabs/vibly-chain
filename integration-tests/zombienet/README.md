@@ -5,7 +5,7 @@
 Prerequisites:
 
 ```bash
-rustup target add wasm32-unknown-unknown
+rustup target add wasm32v1-none
 npm install -g @zombienet/cli
 zombienet setup polkadot
 ```

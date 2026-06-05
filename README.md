@@ -45,7 +45,7 @@ The solo-node now exposes two named network profiles:
 ## Prerequisites
 
 - Rust toolchain (see `rust-toolchain.toml`)
-- `wasm32-unknown-unknown` target (installed automatically by rustup)
+- `wasm32v1-none` target (installed automatically by rustup)
 - [Zombienet CLI](https://github.com/paritytech/zombienet) for multi-node tests: `npm install -g @zombienet/cli && zombienet setup polkadot`
 
 ## Build
