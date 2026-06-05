@@ -10,9 +10,15 @@ use crate::{
 
 fn load_spec(id: &str) -> std::result::Result<Box<dyn ChainSpec>, String> {
     Ok(match id {
-        "dev" | "solo-dev" => Box::new(chain_spec::development_chain_spec()),
-        "" | "local" | "solo-local" => Box::new(chain_spec::local_chain_spec()),
-        path => Box::new(chain_spec::ChainSpec::from_json_file(std::path::PathBuf::from(path))?),
+        "dev" | "solo-dev" | "monolith" | "vibly-monolith" => {
+            Box::new(chain_spec::development_chain_spec())
+        }
+        "" | "local" | "solo-local" | "lumen" | "vibly-lumen" => {
+            Box::new(chain_spec::local_chain_spec())
+        }
+        path => Box::new(chain_spec::ChainSpec::from_json_file(
+            std::path::PathBuf::from(path),
+        )?),
     })
 }
 
@@ -102,7 +108,9 @@ pub fn run() -> Result<()> {
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit(|config| async move {
-                crate::service::start_node(config).map(|r| r.0).map_err(Into::into)
+                crate::service::start_node(config)
+                    .map(|r| r.0)
+                    .map_err(Into::into)
             })
         }
     }

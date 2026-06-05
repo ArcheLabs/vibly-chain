@@ -20,10 +20,10 @@ const AFTER_HELP_EXAMPLE: &str = color_print::cstr!(
     r#"<bold><underline>Examples:</></>
    <bold>vibly-solo-node --dev --tmp</>
            Launch a temporary standalone development chain.
-   <bold>vibly-solo-node --chain solo-local --alice</>
-           Launch a local testnet node using Alice's authority keys.
-   <bold>vibly-solo-node export-chain-spec --chain solo-dev</>
-           Export the solo development chainspec.
+   <bold>vibly-solo-node --chain lumen --alice</>
+           Launch a Lumen local testnet node using Alice's authority keys.
+   <bold>vibly-solo-node export-chain-spec --chain monolith</>
+           Export the Monolith incentivized testnet chainspec.
  "#
 );
 
