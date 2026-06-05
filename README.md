@@ -9,6 +9,17 @@
 
 The solo-node is the primary target for local development and E2E testing with `vibly-coordinator` and `vibly-indexer`.
 
+## Solo network names
+
+The solo-node now exposes two named network profiles:
+
+| Profile | CLI aliases | Intended use |
+|---|---|---|
+| `Monolith` | `monolith`, `vibly-monolith`, legacy `solo-dev` / `dev` | Incentivized testnet / main public network track |
+| `Lumen` | `lumen`, `vibly-lumen`, legacy `solo-local` / `local` | Testnet and local validation track |
+
+`Monolith` uses a dedicated sudo account and no longer endows the public Alice/Bob development accounts in genesis. `Lumen` keeps the familiar local-authority flow so local node startup and faucet-style testing remain easy.
+
 ## Pallets
 
 ### Shared (parachain + solo-node)
@@ -58,7 +69,7 @@ cargo build --release -p vibly-solo-node
 
 ```bash
 cargo build --release -p vibly-solo-node
-./target/release/vibly-solo-node --dev --tmp
+./target/release/vibly-solo-node --chain lumen --tmp
 # WebSocket: ws://127.0.0.1:9944
 # Polkadot.js Apps: https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944
 ```
@@ -66,7 +77,7 @@ cargo build --release -p vibly-solo-node
 With external RPC access (required for Docker-based indexer):
 
 ```bash
-./target/release/vibly-solo-node --dev --tmp --rpc-external --rpc-cors all
+./target/release/vibly-solo-node --chain lumen --tmp --rpc-external --rpc-cors all
 ```
 
 Pair with the coordinator:
