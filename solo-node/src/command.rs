@@ -10,11 +10,10 @@ use crate::{
 
 fn load_spec(id: &str) -> std::result::Result<Box<dyn ChainSpec>, String> {
     Ok(match id {
-        "dev" | "solo-dev" | "monolith" | "vibly-monolith" => {
-            Box::new(chain_spec::development_chain_spec())
-        }
-        "" | "local" | "solo-local" | "lumen" | "vibly-lumen" => {
-            Box::new(chain_spec::local_chain_spec())
+        "monolith" | "vibly-monolith" => Box::new(chain_spec::monolith_chain_spec()),
+        "lumen" | "vibly-lumen" => Box::new(chain_spec::lumen_chain_spec()),
+        "" | "local" | "solo-local" | "dev" | "solo-dev" => {
+            Box::new(chain_spec::local_testnet_chain_spec())
         }
         path => Box::new(chain_spec::ChainSpec::from_json_file(
             std::path::PathBuf::from(path),

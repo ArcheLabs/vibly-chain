@@ -11,9 +11,11 @@ extern crate alloc;
 
 use alloc::vec::Vec;
 use frame_support::{
-    derive_impl,
-    parameter_types,
-    traits::{ConstBool, ConstU32, ConstU64, ConstU8, EnsureOrigin, Get, InitializeMembers, ChangeMembers, SortedMembers, VariantCountOf},
+    derive_impl, parameter_types,
+    traits::{
+        ChangeMembers, ConstBool, ConstU32, ConstU64, ConstU8, EnsureOrigin, Get,
+        InitializeMembers, SortedMembers, VariantCountOf,
+    },
     weights::{
         constants::WEIGHT_REF_TIME_PER_SECOND, ConstantMultiplier, Weight, WeightToFeeCoefficient,
         WeightToFeeCoefficients, WeightToFeePolynomial,
@@ -37,9 +39,9 @@ use sp_version::NativeVersion;
 
 pub use pallet_aura::Authorities as AuraAuthorities;
 pub use pallet_grandpa::fg_primitives;
+use polkadot_sdk_frame::runtime::prelude::build_state;
 pub use sp_consensus_aura::sr25519::AuthorityId as AuraId;
 pub use sp_runtime::{MultiAddress, OpaqueExtrinsic};
-use polkadot_sdk_frame::runtime::prelude::build_state;
 
 pub type Signature = MultiSignature;
 pub type AccountId = <<Signature as Verify>::Signer as IdentifyAccount>::AccountId;
@@ -108,7 +110,10 @@ pub const VERSION: RuntimeVersion = RuntimeVersion {
 
 #[cfg(feature = "std")]
 pub fn native_version() -> NativeVersion {
-    NativeVersion { runtime_version: VERSION, can_author_with: Default::default() }
+    NativeVersion {
+        runtime_version: VERSION,
+        can_author_with: Default::default(),
+    }
 }
 
 pub const MILLI_SECS_PER_BLOCK: u64 = 6000;
@@ -124,10 +129,8 @@ pub const EXISTENTIAL_DEPOSIT: Balance = MILLI_UNIT;
 
 const AVERAGE_ON_INITIALIZE_RATIO: Perbill = Perbill::from_percent(5);
 const NORMAL_DISPATCH_RATIO: Perbill = Perbill::from_percent(75);
-const MAXIMUM_BLOCK_WEIGHT: Weight = Weight::from_parts(
-    WEIGHT_REF_TIME_PER_SECOND.saturating_mul(2),
-    u64::MAX,
-);
+const MAXIMUM_BLOCK_WEIGHT: Weight =
+    Weight::from_parts(WEIGHT_REF_TIME_PER_SECOND.saturating_mul(2), u64::MAX);
 
 pub struct WeightToFee;
 impl WeightToFeePolynomial for WeightToFee {
@@ -251,25 +254,33 @@ impl pallet_sudo::Config for Runtime {
 #[derive(Clone, Debug, Eq, PartialEq, scale_info::TypeInfo)]
 pub struct IdentityMaxCidLen;
 impl Get<u32> for IdentityMaxCidLen {
-    fn get() -> u32 { 96 }
+    fn get() -> u32 {
+        96
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, scale_info::TypeInfo)]
 pub struct IdentityMaxUriLen;
 impl Get<u32> for IdentityMaxUriLen {
-    fn get() -> u32 { 256 }
+    fn get() -> u32 {
+        256
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, scale_info::TypeInfo)]
 pub struct IdentityMaxTransportAccountLen;
 impl Get<u32> for IdentityMaxTransportAccountLen {
-    fn get() -> u32 { 128 }
+    fn get() -> u32 {
+        128
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, scale_info::TypeInfo)]
 pub struct PaymentMaxNamespaceLen;
 impl Get<u32> for PaymentMaxNamespaceLen {
-    fn get() -> u32 { 64 }
+    fn get() -> u32 {
+        64
+    }
 }
 
 impl pallet_identity_core::Config for Runtime {
@@ -419,8 +430,7 @@ impl EnsureOrigin<RuntimeOrigin> for EnsureGuardianMember {
     }
 }
 
-pub type GuardianCollectiveTwoThirds =
-    EnsureProportionAtLeast<AccountId, Instance1, 2, 3>;
+pub type GuardianCollectiveTwoThirds = EnsureProportionAtLeast<AccountId, Instance1, 2, 3>;
 
 impl pallet_vibly_emergency::Config for Runtime {
     type WeightInfo = pallet_vibly_emergency::weights::SubstrateWeight<Runtime>;
@@ -688,7 +698,46 @@ pub mod genesis_config_presets {
         }
     }
 
-    pub fn development_config(
+    pub fn custom_config(
+        sudo: AccountId,
+        aura: Vec<AuraId>,
+        grandpa: Vec<fg_primitives::AuthorityId>,
+        guardians: Vec<AccountId>,
+        balances: Vec<(AccountId, Balance)>,
+        reward_config: Option<pallet_agent_incentives::RewardConfig>,
+        reward_settlement_publisher: Option<AccountId>,
+    ) -> RuntimeGenesisConfig {
+        RuntimeGenesisConfig {
+            system: Default::default(),
+            balances: pallet_balances::GenesisConfig {
+                balances,
+                ..Default::default()
+            },
+            sudo: pallet_sudo::GenesisConfig {
+                key: Some(sudo.clone()),
+            },
+            aura: pallet_aura::GenesisConfig { authorities: aura },
+            grandpa: pallet_grandpa::GenesisConfig {
+                authorities: grandpa
+                    .into_iter()
+                    .map(|authority| (authority, 1))
+                    .collect(),
+                ..Default::default()
+            },
+            guardian_membership: pallet_membership::GenesisConfig {
+                members: guardians.try_into().expect("guardian set fits MaxMembers"),
+                ..Default::default()
+            },
+            guardian_collective: Default::default(),
+            transaction_payment: Default::default(),
+            agent_incentives: pallet_agent_incentives::GenesisConfig {
+                reward_config,
+                reward_settlement_publisher,
+            },
+        }
+    }
+
+    pub fn local_testnet_config(
         sudo: AccountId,
         aura: Vec<AuraId>,
         grandpa: Vec<fg_primitives::AuthorityId>,
@@ -700,31 +749,17 @@ pub mod genesis_config_presets {
             .map(|account| (account, 1_000_000 * UNIT))
             .collect();
         balances.push((RewardReserveAccount::get(), 30_000_000 * UNIT));
-        balances.push((ClaimReserveAccount::get(), 30_000_000 * UNIT));
+        balances.push((ClaimReserveAccount::get(), 50_000_000 * UNIT));
 
-        RuntimeGenesisConfig {
-            system: Default::default(),
-            balances: pallet_balances::GenesisConfig {
-                balances,
-                ..Default::default()
-            },
-            sudo: pallet_sudo::GenesisConfig { key: Some(sudo.clone()) },
-            aura: pallet_aura::GenesisConfig { authorities: aura },
-            grandpa: pallet_grandpa::GenesisConfig {
-                authorities: grandpa.into_iter().map(|authority| (authority, 1)).collect(),
-                ..Default::default()
-            },
-            guardian_membership: pallet_membership::GenesisConfig {
-                members: guardians.try_into().expect("guardian set fits MaxMembers"),
-                ..Default::default()
-            },
-            guardian_collective: Default::default(),
-            transaction_payment: Default::default(),
-            agent_incentives: pallet_agent_incentives::GenesisConfig {
-                reward_config: Some(default_reward_config()),
-                reward_settlement_publisher: Some(sudo),
-            },
-        }
+        custom_config(
+            sudo.clone(),
+            aura,
+            grandpa,
+            guardians,
+            balances,
+            Some(default_reward_config()),
+            Some(sudo),
+        )
     }
 
     pub fn get_preset(id: &Option<PresetId>) -> Option<Vec<u8>> {

@@ -19,9 +19,9 @@ pub enum Subcommand {
 const AFTER_HELP_EXAMPLE: &str = color_print::cstr!(
     r#"<bold><underline>Examples:</></>
    <bold>vibly-solo-node --dev --tmp</>
-           Launch a temporary standalone development chain.
-   <bold>vibly-solo-node --chain lumen --alice</>
-           Launch a Lumen local testnet node using Alice's authority keys.
+           Launch the local standalone testnet for development and E2E.
+   <bold>vibly-solo-node --chain lumen</>
+           Launch the Lumen public testnet chain spec.
    <bold>vibly-solo-node export-chain-spec --chain monolith</>
            Export the Monolith incentivized testnet chainspec.
  "#

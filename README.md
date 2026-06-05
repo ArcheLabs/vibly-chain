@@ -11,14 +11,15 @@ The solo-node is the primary target for local development and E2E testing with `
 
 ## Solo network names
 
-The solo-node now exposes two named network profiles:
+The solo-node now exposes three named network profiles:
 
 | Profile | CLI aliases | Intended use |
 |---|---|---|
-| `Monolith` | `monolith`, `vibly-monolith`, legacy `solo-dev` / `dev` | Incentivized testnet / main public network track |
-| `Lumen` | `lumen`, `vibly-lumen`, legacy `solo-local` / `local` | Testnet and local validation track |
+| `Monolith` | `monolith`, `vibly-monolith` | Incentivized testnet with reward + Get VIB reserves |
+| `Lumen` | `lumen`, `vibly-lumen` | Public testnet with faucet allocation |
+| `Local Testnet` | `local`, `solo-local`, `dev`, `solo-dev`, default empty alias | Local development / E2E profile |
 
-`Monolith` uses a dedicated sudo account and no longer endows the public Alice/Bob development accounts in genesis. `Lumen` keeps the familiar local-authority flow so local node startup and faucet-style testing remain easy.
+`Monolith` and `Lumen` are both modeled as public solo-chain specs. `Monolith` carries the incentivized testnet reward reserve plus the Get VIB claim reserve; `Lumen` carries the dedicated faucet allocation. The old Alice/Bob local-authority flow now lives only in `Local Testnet`, so browser and E2E workflows remain easy to boot without mixing public-network token semantics into local runs.
 
 ## Pallets
 
@@ -69,7 +70,7 @@ cargo build --release -p vibly-solo-node
 
 ```bash
 cargo build --release -p vibly-solo-node
-./target/release/vibly-solo-node --chain lumen --tmp
+./target/release/vibly-solo-node --dev --tmp
 # WebSocket: ws://127.0.0.1:9944
 # Polkadot.js Apps: https://polkadot.js.org/apps/?rpc=ws%3A%2F%2F127.0.0.1%3A9944
 ```
@@ -77,7 +78,14 @@ cargo build --release -p vibly-solo-node
 With external RPC access (required for Docker-based indexer):
 
 ```bash
-./target/release/vibly-solo-node --chain lumen --tmp --rpc-external --rpc-cors all
+./target/release/vibly-solo-node --dev --tmp --rpc-external --rpc-cors all
+```
+
+Export a public chainspec:
+
+```bash
+./target/release/vibly-solo-node export-chain-spec --chain monolith > monolith.json
+./target/release/vibly-solo-node export-chain-spec --chain lumen > lumen.json
 ```
 
 Pair with the coordinator:

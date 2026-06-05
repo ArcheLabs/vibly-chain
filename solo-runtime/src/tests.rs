@@ -1,13 +1,9 @@
 use super::*;
 use frame_support::{assert_noop, assert_ok};
-use sp_runtime::traits::{BlakeTwo256, Hash};
 use pallet_vibly_emergency::{EmergencyStatus, Error as EmergencyError, StatusByScope};
 use sp_core::sr25519;
-use sp_runtime::{
-    traits::IdentifyAccount,
-    BuildStorage, DispatchError,
-    MultiSigner,
-};
+use sp_runtime::traits::{BlakeTwo256, Hash};
+use sp_runtime::{traits::IdentifyAccount, BuildStorage, DispatchError, MultiSigner};
 
 fn account(seed: u8) -> AccountId {
     MultiSigner::from(sr25519::Public::from_raw([seed; 32])).into_account()
@@ -28,11 +24,13 @@ fn new_test_ext() -> sp_io::TestExternalities {
                 (charlie.clone(), 1_000_000 * UNIT),
                 (dave, 1_000_000 * UNIT),
                 (RewardReserveAccount::get(), 30_000_000 * UNIT),
-                (ClaimReserveAccount::get(), 30_000_000 * UNIT),
+                (ClaimReserveAccount::get(), 50_000_000 * UNIT),
             ],
             ..Default::default()
         },
-        sudo: pallet_sudo::GenesisConfig { key: Some(alice.clone()) },
+        sudo: pallet_sudo::GenesisConfig {
+            key: Some(alice.clone()),
+        },
         aura: pallet_aura::GenesisConfig {
             authorities: vec![AuraId::from(sp_core::sr25519::Public::from_raw([1; 32]))],
         },
@@ -68,8 +66,15 @@ fn guardian_member_can_pause_proposal() {
         let alice = account(1);
         let scope = EmergencyScope::Proposal(1);
 
-        assert_ok!(ViblyEmergency::pause(RuntimeOrigin::signed(alice), scope.clone(), None));
-        assert_eq!(StatusByScope::<Runtime>::get(scope), EmergencyStatus::Paused);
+        assert_ok!(ViblyEmergency::pause(
+            RuntimeOrigin::signed(alice),
+            scope.clone(),
+            None
+        ));
+        assert_eq!(
+            StatusByScope::<Runtime>::get(scope),
+            EmergencyStatus::Paused
+        );
     });
 }
 
@@ -78,7 +83,11 @@ fn non_guardian_cannot_pause_proposal() {
     new_test_ext().execute_with(|| {
         let dave = account(4);
         assert_noop!(
-            ViblyEmergency::pause(RuntimeOrigin::signed(dave), EmergencyScope::Proposal(1), None),
+            ViblyEmergency::pause(
+                RuntimeOrigin::signed(dave),
+                EmergencyScope::Proposal(1),
+                None
+            ),
             DispatchError::BadOrigin
         );
     });
@@ -90,13 +99,20 @@ fn collective_two_thirds_can_resume_paused_proposal() {
         let alice = account(1);
         let scope = EmergencyScope::Proposal(1);
 
-        assert_ok!(ViblyEmergency::pause(RuntimeOrigin::signed(alice), scope.clone(), None));
+        assert_ok!(ViblyEmergency::pause(
+            RuntimeOrigin::signed(alice),
+            scope.clone(),
+            None
+        ));
         assert_ok!(ViblyEmergency::resume(
             pallet_collective::RawOrigin::Members(2, 3).into(),
             scope.clone(),
             None,
         ));
-        assert_eq!(StatusByScope::<Runtime>::get(scope), EmergencyStatus::Active);
+        assert_eq!(
+            StatusByScope::<Runtime>::get(scope),
+            EmergencyStatus::Active
+        );
     });
 }
 
@@ -106,13 +122,20 @@ fn collective_two_thirds_can_cancel_paused_proposal() {
         let alice = account(1);
         let scope = EmergencyScope::Proposal(1);
 
-        assert_ok!(ViblyEmergency::pause(RuntimeOrigin::signed(alice), scope.clone(), None));
+        assert_ok!(ViblyEmergency::pause(
+            RuntimeOrigin::signed(alice),
+            scope.clone(),
+            None
+        ));
         assert_ok!(ViblyEmergency::cancel(
             pallet_collective::RawOrigin::Members(2, 3).into(),
             scope.clone(),
             None,
         ));
-        assert_eq!(StatusByScope::<Runtime>::get(scope), EmergencyStatus::Cancelled);
+        assert_eq!(
+            StatusByScope::<Runtime>::get(scope),
+            EmergencyStatus::Cancelled
+        );
     });
 }
 
@@ -180,9 +203,12 @@ fn agent_incentives_runtime_flow_works() {
         assert_ok!(AgentIncentives::settle_base_staking_day(
             RuntimeOrigin::signed(account(2)),
             0,
-            vec![pallet_agent_incentives::AgentRef { identity_id, agent_id }]
-                .try_into()
-                .unwrap(),
+            vec![pallet_agent_incentives::AgentRef {
+                identity_id,
+                agent_id
+            }]
+            .try_into()
+            .unwrap(),
         ));
 
         let ledger =

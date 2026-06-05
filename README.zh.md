@@ -9,6 +9,18 @@
 
 单节点是本地开发及配合 `vibly-coordinator` 和 `vibly-indexer` 进行 E2E 测试的主要目标。
 
+## 单节点网络名称
+
+单节点现在暴露三套命名网络规格：
+
+| 规格 | CLI 别名 | 用途 |
+|---|---|---|
+| `Monolith` | `monolith`, `vibly-monolith` | 激励测试网，包含奖励池和 Get VIB claim reserve |
+| `Lumen` | `lumen`, `vibly-lumen` | 公共测试网，包含专用水龙头分配 |
+| `Local Testnet` | `local`, `solo-local`, `dev`, `solo-dev`，以及空别名默认值 | 本地开发 / E2E 规格 |
+
+`Monolith` 和 `Lumen` 都按公开链语义建模；`Monolith` 负责保留激励测试网奖励与 Get VIB 市场储备，`Lumen` 负责保留测试网水龙头余额。原先基于 Alice/Bob 的本地 authority 流程只保留在 `Local Testnet`，避免把公网链资金语义和本地联调混在一起。
+
 ## Pallet 一览
 
 ### 共享（平行链 + 单节点）
@@ -67,6 +79,13 @@ cargo build --release -p vibly-solo-node
 
 ```bash
 ./target/release/vibly-solo-node --dev --tmp --rpc-external --rpc-cors all
+```
+
+导出公网链规格：
+
+```bash
+./target/release/vibly-solo-node export-chain-spec --chain monolith > monolith.json
+./target/release/vibly-solo-node export-chain-spec --chain lumen > lumen.json
 ```
 
 配合协调器使用：
