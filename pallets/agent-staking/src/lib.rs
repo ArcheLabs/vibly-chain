@@ -20,17 +20,15 @@ pub mod pallet {
     use frame::{
         prelude::*,
         traits::{
-            tokens::{
-                fungible::hold::Mutate as HoldMutate,
-                Precision,
-            },
+            tokens::{fungible::hold::Mutate as HoldMutate, Precision},
             EnsureOrigin,
         },
     };
     use vibly_primitives_common::{Amount, ContentRef, Hash256};
     use vibly_primitives_identity::{IdentityAccess, IdentityId};
 
-    type ContentRefOf<T> = ContentRef<<T as Config>::MaxReasonCidLen, <T as Config>::MaxReasonUriLen>;
+    type ContentRefOf<T> =
+        ContentRef<<T as Config>::MaxReasonCidLen, <T as Config>::MaxReasonUriLen>;
     type BlockNumberFor<T> = frame_system::pallet_prelude::BlockNumberFor<T>;
 
     #[pallet::composite_enum]
@@ -40,14 +38,35 @@ pub mod pallet {
         AgentStake,
     }
 
-    #[derive(Clone, Copy, Eq, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Copy,
+        Eq,
+        PartialEq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     pub enum AgentStakeStatus {
         Active,
         Unbonding,
         Released,
     }
 
-    #[derive(Clone, Eq, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Eq,
+        PartialEq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(AccountId, BlockNumber))]
     pub struct AgentStakeLedger<AccountId, BlockNumber, MaxCidLen: Get<u32>, MaxUriLen: Get<u32>> {
         pub identity_id: IdentityId,
@@ -62,7 +81,18 @@ pub mod pallet {
         pub updated_at_block: BlockNumber,
     }
 
-    #[derive(Clone, Default, Eq, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Default,
+        Eq,
+        PartialEq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(BlockNumber))]
     pub struct AgentStakeHold<BlockNumber> {
         pub active_amount: Amount,
@@ -71,10 +101,16 @@ pub mod pallet {
     }
 
     #[pallet::config]
-    pub trait Config: frame_system::Config + pallet_identity_core::Config + pallet_onboarding_distribution::Config {
+    pub trait Config:
+        frame_system::Config + pallet_identity_core::Config + pallet_onboarding_distribution::Config
+    {
         type WeightInfo: WeightInfo;
         type IdentityProvider: IdentityAccess<Self::AccountId>;
-        type Currency: HoldMutate<Self::AccountId, Balance = Amount, Reason = Self::RuntimeHoldReason>;
+        type Currency: HoldMutate<
+            Self::AccountId,
+            Balance = Amount,
+            Reason = Self::RuntimeHoldReason,
+        >;
         type RuntimeHoldReason: From<HoldReason>;
         type ReleaseBlockOrigin: EnsureOrigin<Self::RuntimeOrigin>;
         #[pallet::constant]
@@ -175,11 +211,15 @@ pub mod pallet {
             let key = (identity_id, agent_id, who.clone());
             AgentStakeHolds::<T>::try_mutate_exists(key, |maybe_hold| -> DispatchResult {
                 let mut hold = maybe_hold.take().unwrap_or_default();
-                hold.active_amount = hold.active_amount.checked_add(amount).ok_or(Error::<T>::Overflow)?;
+                hold.active_amount = hold
+                    .active_amount
+                    .checked_add(amount)
+                    .ok_or(Error::<T>::Overflow)?;
                 *maybe_hold = Some(hold);
                 Ok(())
             })?;
-            let ledger = Self::recompute_ledger(identity_id, agent_id, Some(who.clone()), None, false)?;
+            let ledger =
+                Self::recompute_ledger(identity_id, agent_id, Some(who.clone()), None, false)?;
             Self::deposit_event(Event::AgentStakeBonded {
                 identity_id,
                 agent_id,
@@ -208,15 +248,29 @@ pub mod pallet {
                 .ok_or(Error::<T>::Overflow)?;
             let key = (identity_id, agent_id, who.clone());
             AgentStakeHolds::<T>::try_mutate_exists(key, |maybe_hold| -> DispatchResult {
-                let mut hold = maybe_hold.take().ok_or(Error::<T>::InsufficientActiveStake)?;
-                ensure!(hold.active_amount >= amount, Error::<T>::InsufficientActiveStake);
+                let mut hold = maybe_hold
+                    .take()
+                    .ok_or(Error::<T>::InsufficientActiveStake)?;
+                ensure!(
+                    hold.active_amount >= amount,
+                    Error::<T>::InsufficientActiveStake
+                );
                 hold.active_amount = hold.active_amount.saturating_sub(amount);
-                hold.unbonding_amount = hold.unbonding_amount.checked_add(amount).ok_or(Error::<T>::Overflow)?;
+                hold.unbonding_amount = hold
+                    .unbonding_amount
+                    .checked_add(amount)
+                    .ok_or(Error::<T>::Overflow)?;
                 hold.unlock_at_block = Some(unlock_at);
                 *maybe_hold = Some(hold);
                 Ok(())
             })?;
-            Self::recompute_ledger(identity_id, agent_id, Some(who.clone()), Some(unlock_at), false)?;
+            Self::recompute_ledger(
+                identity_id,
+                agent_id,
+                Some(who.clone()),
+                Some(unlock_at),
+                false,
+            )?;
             Self::deposit_event(Event::AgentStakeUnbondRequested {
                 identity_id,
                 agent_id,
@@ -243,7 +297,10 @@ pub mod pallet {
                 let mut hold = maybe_hold.take().ok_or(Error::<T>::NoUnbondingStake)?;
                 ensure!(hold.unbonding_amount > 0, Error::<T>::NoUnbondingStake);
                 cancelled = hold.unbonding_amount;
-                hold.active_amount = hold.active_amount.checked_add(hold.unbonding_amount).ok_or(Error::<T>::Overflow)?;
+                hold.active_amount = hold
+                    .active_amount
+                    .checked_add(hold.unbonding_amount)
+                    .ok_or(Error::<T>::Overflow)?;
                 hold.unbonding_amount = 0;
                 hold.unlock_at_block = None;
                 *maybe_hold = Some(hold);
@@ -269,12 +326,17 @@ pub mod pallet {
         ) -> DispatchResult {
             T::ReleaseBlockOrigin::ensure_origin(origin)?;
             Self::ensure_agent_registered(identity_id, agent_id)?;
-            let mut ledger = AgentStakeLedgers::<T>::get((identity_id, agent_id)).ok_or(Error::<T>::NoUnbondingStake)?;
+            let mut ledger = AgentStakeLedgers::<T>::get((identity_id, agent_id))
+                .ok_or(Error::<T>::NoUnbondingStake)?;
             ledger.release_blocked = true;
             ledger.release_block_reason = reason_ref.clone();
             ledger.updated_at_block = frame_system::Pallet::<T>::block_number();
             AgentStakeLedgers::<T>::insert((identity_id, agent_id), ledger);
-            Self::deposit_event(Event::AgentStakeReleaseBlocked { identity_id, agent_id, reason_ref });
+            Self::deposit_event(Event::AgentStakeReleaseBlocked {
+                identity_id,
+                agent_id,
+                reason_ref,
+            });
             Ok(())
         }
 
@@ -286,12 +348,16 @@ pub mod pallet {
             agent_id: Hash256,
         ) -> DispatchResult {
             T::ReleaseBlockOrigin::ensure_origin(origin)?;
-            let mut ledger = AgentStakeLedgers::<T>::get((identity_id, agent_id)).ok_or(Error::<T>::NoUnbondingStake)?;
+            let mut ledger = AgentStakeLedgers::<T>::get((identity_id, agent_id))
+                .ok_or(Error::<T>::NoUnbondingStake)?;
             ledger.release_blocked = false;
             ledger.release_block_reason = None;
             ledger.updated_at_block = frame_system::Pallet::<T>::block_number();
             AgentStakeLedgers::<T>::insert((identity_id, agent_id), ledger);
-            Self::deposit_event(Event::AgentStakeReleaseCleared { identity_id, agent_id });
+            Self::deposit_event(Event::AgentStakeReleaseCleared {
+                identity_id,
+                agent_id,
+            });
             Ok(())
         }
 
@@ -303,7 +369,8 @@ pub mod pallet {
             agent_id: Hash256,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
-            let ledger = AgentStakeLedgers::<T>::get((identity_id, agent_id)).ok_or(Error::<T>::NoUnbondingStake)?;
+            let ledger = AgentStakeLedgers::<T>::get((identity_id, agent_id))
+                .ok_or(Error::<T>::NoUnbondingStake)?;
             ensure!(!ledger.release_blocked, Error::<T>::ReleaseBlocked);
 
             let key = (identity_id, agent_id, who.clone());
@@ -312,7 +379,10 @@ pub mod pallet {
                 let hold = maybe_hold.as_mut().ok_or(Error::<T>::NoUnbondingStake)?;
                 ensure!(hold.unbonding_amount > 0, Error::<T>::NoUnbondingStake);
                 let unlock_at = hold.unlock_at_block.ok_or(Error::<T>::NoUnbondingStake)?;
-                ensure!(frame_system::Pallet::<T>::block_number() >= unlock_at, Error::<T>::UnbondingNotReady);
+                ensure!(
+                    frame_system::Pallet::<T>::block_number() >= unlock_at,
+                    Error::<T>::UnbondingNotReady
+                );
                 released = hold.unbonding_amount;
                 hold.unbonding_amount = 0;
                 hold.unlock_at_block = None;
@@ -321,7 +391,12 @@ pub mod pallet {
                 }
                 Ok(())
             })?;
-            let _ = <T as Config>::Currency::release(&HoldReason::AgentStake.into(), &who, released, Precision::Exact)?;
+            let _ = <T as Config>::Currency::release(
+                &HoldReason::AgentStake.into(),
+                &who,
+                released,
+                Precision::Exact,
+            )?;
             Self::recompute_ledger(identity_id, agent_id, Some(who.clone()), None, false)?;
             Self::deposit_event(Event::AgentStakeReleased {
                 identity_id,
@@ -336,7 +411,10 @@ pub mod pallet {
     impl<T: Config> Pallet<T> {
         fn ensure_agent_registered(identity_id: IdentityId, agent_id: Hash256) -> DispatchResult {
             ensure!(
-                pallet_onboarding_distribution::AgentRegistrations::<T>::contains_key((identity_id, agent_id)),
+                pallet_onboarding_distribution::AgentRegistrations::<T>::contains_key((
+                    identity_id,
+                    agent_id
+                )),
                 Error::<T>::AgentNotRegistered
             );
             Ok(())
@@ -348,7 +426,15 @@ pub mod pallet {
             last_funding_account: Option<T::AccountId>,
             unlock_hint: Option<BlockNumberFor<T>>,
             preserve_block: bool,
-        ) -> Result<AgentStakeLedger<T::AccountId, BlockNumberFor<T>, T::MaxReasonCidLen, T::MaxReasonUriLen>, DispatchError> {
+        ) -> Result<
+            AgentStakeLedger<
+                T::AccountId,
+                BlockNumberFor<T>,
+                T::MaxReasonCidLen,
+                T::MaxReasonUriLen,
+            >,
+            DispatchError,
+        > {
             let mut active_amount: Amount = 0;
             let mut unbonding_amount: Amount = 0;
             let mut unlock_at_block: Option<BlockNumberFor<T>> = unlock_hint;
@@ -356,10 +442,15 @@ pub mod pallet {
                 if hold_identity_id != identity_id || hold_agent_id != agent_id {
                     continue;
                 }
-                active_amount = active_amount.checked_add(hold.active_amount).ok_or(Error::<T>::Overflow)?;
-                unbonding_amount = unbonding_amount.checked_add(hold.unbonding_amount).ok_or(Error::<T>::Overflow)?;
+                active_amount = active_amount
+                    .checked_add(hold.active_amount)
+                    .ok_or(Error::<T>::Overflow)?;
+                unbonding_amount = unbonding_amount
+                    .checked_add(hold.unbonding_amount)
+                    .ok_or(Error::<T>::Overflow)?;
                 if let Some(unlock_at) = hold.unlock_at_block {
-                    unlock_at_block = Some(unlock_at_block.map_or(unlock_at, |current| current.max(unlock_at)));
+                    unlock_at_block =
+                        Some(unlock_at_block.map_or(unlock_at, |current| current.max(unlock_at)));
                 }
             }
             let existing = AgentStakeLedgers::<T>::get((identity_id, agent_id));
@@ -377,7 +468,17 @@ pub mod pallet {
                 unbonding_amount,
                 status,
                 unlock_at_block,
-                release_blocked: if preserve_block { existing.as_ref().map(|l| l.release_blocked).unwrap_or(false) } else { existing.as_ref().map(|l| l.release_blocked).unwrap_or(false) },
+                release_blocked: if preserve_block {
+                    existing
+                        .as_ref()
+                        .map(|l| l.release_blocked)
+                        .unwrap_or(false)
+                } else {
+                    existing
+                        .as_ref()
+                        .map(|l| l.release_blocked)
+                        .unwrap_or(false)
+                },
                 release_block_reason: existing.and_then(|l| l.release_block_reason),
                 last_funding_account,
                 updated_at_block: frame_system::Pallet::<T>::block_number(),

@@ -188,12 +188,25 @@ pub mod pallet {
             let who = T::PauseOrigin::ensure_origin(origin)?;
 
             let status = StatusByScope::<T>::get(&scope);
-            ensure!(status != EmergencyStatus::Cancelled, Error::<T>::AlreadyCancelled);
+            ensure!(
+                status != EmergencyStatus::Cancelled,
+                Error::<T>::AlreadyCancelled
+            );
 
             StatusByScope::<T>::insert(&scope, EmergencyStatus::Paused);
-            LastPauseRecord::<T>::insert(&scope, PauseRecord { by: who.clone(), reason_hash });
+            LastPauseRecord::<T>::insert(
+                &scope,
+                PauseRecord {
+                    by: who.clone(),
+                    reason_hash,
+                },
+            );
 
-            Self::deposit_event(Event::Paused { scope, by: who, reason_hash });
+            Self::deposit_event(Event::Paused {
+                scope,
+                by: who,
+                reason_hash,
+            });
             Ok(())
         }
 
@@ -211,7 +224,10 @@ pub mod pallet {
             T::ResumeOrigin::ensure_origin(origin)?;
 
             let status = StatusByScope::<T>::get(&scope);
-            ensure!(status != EmergencyStatus::Cancelled, Error::<T>::AlreadyCancelled);
+            ensure!(
+                status != EmergencyStatus::Cancelled,
+                Error::<T>::AlreadyCancelled
+            );
             ensure!(status == EmergencyStatus::Paused, Error::<T>::NotPaused);
 
             StatusByScope::<T>::remove(&scope);
@@ -235,7 +251,10 @@ pub mod pallet {
             T::CancelOrigin::ensure_origin(origin)?;
 
             let status = StatusByScope::<T>::get(&scope);
-            ensure!(status != EmergencyStatus::Cancelled, Error::<T>::AlreadyCancelled);
+            ensure!(
+                status != EmergencyStatus::Cancelled,
+                Error::<T>::AlreadyCancelled
+            );
 
             StatusByScope::<T>::insert(&scope, EmergencyStatus::Cancelled);
 

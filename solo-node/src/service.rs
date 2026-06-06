@@ -38,7 +38,13 @@ pub type Service = PartialComponents<
 
 fn telemetry(
     config: &Configuration,
-) -> Result<(Option<(TelemetryWorker, Telemetry)>, Option<TelemetryWorkerHandle>), sc_service::Error> {
+) -> Result<
+    (
+        Option<(TelemetryWorker, Telemetry)>,
+        Option<TelemetryWorkerHandle>,
+    ),
+    sc_service::Error,
+> {
     let telemetry = config
         .telemetry_endpoints
         .clone()
@@ -75,14 +81,18 @@ pub fn new_partial(config: &Configuration) -> Result<Service, sc_service::Error>
     let (client, backend, keystore_container, task_manager) =
         sc_service::new_full_parts::<Block, RuntimeApi, _>(
             config,
-            telemetry_pair.as_ref().map(|(_, telemetry)| telemetry.handle()),
+            telemetry_pair
+                .as_ref()
+                .map(|(_, telemetry)| telemetry.handle()),
             executor,
         )?;
     let client = Arc::new(client);
     let select_chain = sc_consensus::LongestChain::new(backend.clone());
 
     let telemetry = telemetry_pair.map(|(worker, telemetry)| {
-        task_manager.spawn_handle().spawn("telemetry", None, worker.run());
+        task_manager
+            .spawn_handle()
+            .spawn("telemetry", None, worker.run());
         telemetry
     });
 
@@ -122,7 +132,12 @@ pub fn new_partial(config: &Configuration) -> Result<Service, sc_service::Error>
         task_manager,
         transaction_pool,
         select_chain,
-        other: (grandpa_block_import, grandpa_link, telemetry, telemetry_worker_handle),
+        other: (
+            grandpa_block_import,
+            grandpa_link,
+            telemetry,
+            telemetry_worker_handle,
+        ),
     })
 }
 
@@ -192,7 +207,9 @@ fn start_aura(
                 Ok((slot, timestamp))
             },
             force_authoring,
-            backoff_authoring_blocks: Some(sc_consensus_slots::BackoffAuthoringOnFinalizedHeadLagging::default()),
+            backoff_authoring_blocks: Some(
+                sc_consensus_slots::BackoffAuthoringOnFinalizedHeadLagging::default(),
+            ),
             keystore,
             block_proposal_slot_portion: SlotProportion::new(2f32 / 3f32),
             max_block_proposal_slot_portion: None,
@@ -201,11 +218,15 @@ fn start_aura(
         },
     )?;
 
-    task_manager.spawn_essential_handle().spawn_blocking("aura", None, aura);
+    task_manager
+        .spawn_essential_handle()
+        .spawn_blocking("aura", None, aura);
     Ok(())
 }
 
-pub fn start_node(config: Configuration) -> sc_service::error::Result<(TaskManager, Arc<FullClient>)> {
+pub fn start_node(
+    config: Configuration,
+) -> sc_service::error::Result<(TaskManager, Arc<FullClient>)> {
     let sc_service::PartialComponents {
         client,
         backend,
@@ -222,11 +243,11 @@ pub fn start_node(config: Configuration) -> sc_service::error::Result<(TaskManag
         config.prometheus_config.as_ref().map(|cfg| &cfg.registry),
     );
 
-    let mut net_config =
-        sc_network::config::FullNetworkConfiguration::<Block, Hash, NetworkWorker<Block, Hash>>::new(
-            &config.network,
-            prometheus_registry.clone(),
-        );
+    let mut net_config = sc_network::config::FullNetworkConfiguration::<
+        Block,
+        Hash,
+        NetworkWorker<Block, Hash>,
+    >::new(&config.network, prometheus_registry.clone());
     let genesis_hash = client.chain_info().genesis_hash;
     let grandpa_protocol_name =
         sc_consensus_grandpa::protocol_standard_name(&genesis_hash, &config.chain_spec);

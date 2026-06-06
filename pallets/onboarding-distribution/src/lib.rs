@@ -20,18 +20,26 @@ pub mod pallet {
     use crate::weights::WeightInfo;
     use frame::{
         prelude::*,
-        traits::{
-            tokens::{fungible::Mutate},
-            Time,
-        },
+        traits::{tokens::fungible::Mutate, Time},
     };
     use sp_runtime::traits::{BlakeTwo256, Hash as HashT};
     use vibly_primitives_common::{Amount, ContentRef, Hash256};
     use vibly_primitives_identity::{EvmAddress, IdentityAccess, IdentityId};
 
-    type AgentRefOf<T> = ContentRef<<T as Config>::MaxAgentRefCidLen, <T as Config>::MaxAgentRefUriLen>;
+    type AgentRefOf<T> =
+        ContentRef<<T as Config>::MaxAgentRefCidLen, <T as Config>::MaxAgentRefUriLen>;
 
-    #[derive(Clone, Eq, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Eq,
+        PartialEq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(AccountId))]
     pub struct AirdropClaim<AccountId> {
         pub identity_id: IdentityId,
@@ -43,7 +51,17 @@ pub mod pallet {
         pub claimed_at: u64,
     }
 
-    #[derive(Clone, Eq, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Eq,
+        PartialEq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(AccountId))]
     pub struct DotConversion<AccountId> {
         pub identity_id: IdentityId,
@@ -55,7 +73,17 @@ pub mod pallet {
         pub issued_at: u64,
     }
 
-    #[derive(Clone, Eq, PartialEq, Encode, Decode, DecodeWithMemTracking, RuntimeDebug, TypeInfo, MaxEncodedLen)]
+    #[derive(
+        Clone,
+        Eq,
+        PartialEq,
+        Encode,
+        Decode,
+        DecodeWithMemTracking,
+        RuntimeDebug,
+        TypeInfo,
+        MaxEncodedLen,
+    )]
     #[scale_info(skip_type_params(AccountId, MaxCidLen, MaxUriLen))]
     pub struct AgentRegistration<AccountId, MaxCidLen: Get<u32>, MaxUriLen: Get<u32>> {
         pub identity_id: IdentityId,
@@ -66,7 +94,9 @@ pub mod pallet {
     }
 
     #[pallet::config]
-    pub trait Config: frame_system::Config<RuntimeEvent: From<Event<Self>>> + pallet_identity_core::Config {
+    pub trait Config:
+        frame_system::Config<RuntimeEvent: From<Event<Self>>> + pallet_identity_core::Config
+    {
         type WeightInfo: WeightInfo;
         type AdminOrigin: EnsureOrigin<Self::RuntimeOrigin>;
         type TimeProvider: Time<Moment = u64>;
@@ -91,8 +121,12 @@ pub mod pallet {
     pub type DotConversions<T: Config> =
         StorageMap<_, Blake2_128Concat, Hash256, DotConversion<T::AccountId>>;
     #[pallet::storage]
-    pub type AgentRegistrations<T: Config> =
-        StorageMap<_, Blake2_128Concat, (IdentityId, Hash256), AgentRegistration<T::AccountId, T::MaxAgentRefCidLen, T::MaxAgentRefUriLen>>;
+    pub type AgentRegistrations<T: Config> = StorageMap<
+        _,
+        Blake2_128Concat,
+        (IdentityId, Hash256),
+        AgentRegistration<T::AccountId, T::MaxAgentRefCidLen, T::MaxAgentRefUriLen>,
+    >;
     #[pallet::storage]
     pub type AirdropTotalIssued<T> = StorageValue<_, Amount, ValueQuery>;
     #[pallet::storage]
@@ -109,7 +143,10 @@ pub mod pallet {
     #[pallet::event]
     #[pallet::generate_deposit(pub(super) fn deposit_event)]
     pub enum Event<T: Config> {
-        RelayerAuthorizationSet { relayer: T::AccountId, authorized: bool },
+        RelayerAuthorizationSet {
+            relayer: T::AccountId,
+            authorized: bool,
+        },
         DistributionLimitsSet {
             airdrop_total_cap: Amount,
             conversion_total_cap: Amount,
@@ -148,7 +185,9 @@ pub mod pallet {
             identity_id: IdentityId,
             agent_registrar: T::AccountId,
         },
-        AgentRegistrarRevoked { identity_id: IdentityId },
+        AgentRegistrarRevoked {
+            identity_id: IdentityId,
+        },
     }
 
     #[pallet::error]
@@ -180,7 +219,10 @@ pub mod pallet {
             } else {
                 AuthorizedRelayers::<T>::remove(&relayer);
             }
-            Self::deposit_event(Event::RelayerAuthorizationSet { relayer, authorized });
+            Self::deposit_event(Event::RelayerAuthorizationSet {
+                relayer,
+                authorized,
+            });
             Ok(())
         }
 
@@ -219,14 +261,20 @@ pub mod pallet {
         ) -> DispatchResult {
             let relayer = ensure_signed(origin)?;
             Self::ensure_relayer(&relayer)?;
-            ensure!(!AirdropClaims::<T>::contains_key(evm_address), Error::<T>::AirdropAlreadyClaimed);
-            let total_amount = root_amount.checked_add(registrar_amount).ok_or(Error::<T>::Overflow)?;
+            ensure!(
+                !AirdropClaims::<T>::contains_key(evm_address),
+                Error::<T>::AirdropAlreadyClaimed
+            );
+            let total_amount = root_amount
+                .checked_add(registrar_amount)
+                .ok_or(Error::<T>::Overflow)?;
             Self::ensure_airdrop_limits(total_amount)?;
-            let identity_id = pallet_identity_core::Pallet::<T>::register_evm_identity_from_relayer(
-                evm_address,
-                root_account.clone(),
-                agent_registrar.clone(),
-            )?;
+            let identity_id =
+                pallet_identity_core::Pallet::<T>::register_evm_identity_from_relayer(
+                    evm_address,
+                    root_account.clone(),
+                    agent_registrar.clone(),
+                )?;
             if root_amount > 0 {
                 T::Currency::mint_into(&root_account, root_amount)?;
             }
@@ -295,9 +343,13 @@ pub mod pallet {
         ) -> DispatchResult {
             let relayer = ensure_signed(origin)?;
             Self::ensure_relayer(&relayer)?;
-            ensure!(!DotConversions::<T>::contains_key(payment_id), Error::<T>::DotPaymentAlreadyIssued);
+            ensure!(
+                !DotConversions::<T>::contains_key(payment_id),
+                Error::<T>::DotPaymentAlreadyIssued
+            );
             Self::ensure_conversion_limits(vib_amount)?;
-            let recipient = T::IdentityProvider::owner_account(&identity_id).ok_or(Error::<T>::IdentityNotFound)?;
+            let recipient = T::IdentityProvider::owner_account(&identity_id)
+                .ok_or(Error::<T>::IdentityNotFound)?;
             T::Currency::mint_into(&recipient, vib_amount)?;
             ConversionTotalIssued::<T>::mutate(|issued| {
                 *issued = issued.saturating_add(vib_amount);
@@ -334,7 +386,8 @@ pub mod pallet {
         ) -> DispatchResult {
             let registrar = ensure_signed(origin)?;
             T::IdentityProvider::ensure_can_register_agent(&identity_id, &registrar)?;
-            let agent_id = BlakeTwo256::hash_of(&(b"vibly/agent", identity_id, &registrar, &agent_ref));
+            let agent_id =
+                BlakeTwo256::hash_of(&(b"vibly/agent", identity_id, &registrar, &agent_ref));
             ensure!(
                 !AgentRegistrations::<T>::contains_key((identity_id, agent_id)),
                 Error::<T>::AgentAlreadyRegistered
@@ -398,7 +451,10 @@ pub mod pallet {
             <T as Config>::TimeProvider::now()
         }
         fn ensure_relayer(relayer: &T::AccountId) -> DispatchResult {
-            ensure!(AuthorizedRelayers::<T>::contains_key(relayer), Error::<T>::UnauthorizedRelayer);
+            ensure!(
+                AuthorizedRelayers::<T>::contains_key(relayer),
+                Error::<T>::UnauthorizedRelayer
+            );
             Ok(())
         }
         fn ensure_airdrop_limits(amount: Amount) -> DispatchResult {

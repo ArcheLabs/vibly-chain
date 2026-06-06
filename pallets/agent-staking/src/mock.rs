@@ -42,19 +42,25 @@ mod test_runtime {
 #[derive(Clone, Debug, Eq, PartialEq, scale_info::TypeInfo)]
 pub struct MaxCidLen;
 impl Get<u32> for MaxCidLen {
-    fn get() -> u32 { 96 }
+    fn get() -> u32 {
+        96
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, scale_info::TypeInfo)]
 pub struct MaxUriLen;
 impl Get<u32> for MaxUriLen {
-    fn get() -> u32 { 256 }
+    fn get() -> u32 {
+        256
+    }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, scale_info::TypeInfo)]
 pub struct MaxTransportAccountLen;
 impl Get<u32> for MaxTransportAccountLen {
-    fn get() -> u32 { 128 }
+    fn get() -> u32 {
+        128
+    }
 }
 
 #[derive_impl(frame_system::config_preludes::TestDefaultConfig)]
@@ -122,7 +128,12 @@ impl crate::Config for Test {
 pub fn new_test_ext() -> TestState {
     let mut storage = GenesisConfig::<Test>::default().build_storage().unwrap();
     let _ = pallet_balances::GenesisConfig::<Test> {
-        balances: vec![(1, 1_000_000), (2, 1_000_000), (3, 1_000_000), (4, 1_000_000)],
+        balances: vec![
+            (1, 1_000_000),
+            (2, 1_000_000),
+            (3, 1_000_000),
+            (4, 1_000_000),
+        ],
         dev_accounts: None,
     }
     .assimilate_storage(&mut storage);

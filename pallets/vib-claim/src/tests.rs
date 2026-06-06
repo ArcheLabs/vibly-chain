@@ -189,6 +189,71 @@ fn new_root_claims_only_delta() {
 }
 
 #[test]
+fn claim_for_lets_authorized_publisher_relay_claim_to_user() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(VibClaim::set_claim_root_publisher(
+            RuntimeOrigin::root(),
+            Some(2)
+        ));
+        assert_ok!(VibClaim::set_claim_root(
+            RuntimeOrigin::root(),
+            network_id(),
+            1,
+            root_for(1, 100),
+            100,
+            [1; 32]
+        ));
+
+        assert_ok!(VibClaim::claim_for(
+            RuntimeOrigin::signed(2),
+            1,
+            network_id(),
+            1,
+            identity_id(),
+            100,
+            empty_proof(),
+        ));
+
+        assert_eq!(ClaimedAmount::<Test>::get(1), 100);
+        assert_eq!(Balances::free_balance(1), 110);
+        assert_eq!(Balances::free_balance(2), 10);
+        assert_eq!(Balances::free_balance(RESERVE), 999_900);
+    });
+}
+
+#[test]
+fn claim_for_rejects_non_publisher_relayer() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(VibClaim::set_claim_root_publisher(
+            RuntimeOrigin::root(),
+            Some(2)
+        ));
+        assert_ok!(VibClaim::set_claim_root(
+            RuntimeOrigin::root(),
+            network_id(),
+            1,
+            root_for(1, 100),
+            100,
+            [1; 32]
+        ));
+
+        assert_noop!(
+            VibClaim::claim_for(
+                RuntimeOrigin::signed(1),
+                1,
+                network_id(),
+                1,
+                identity_id(),
+                100,
+                empty_proof(),
+            ),
+            Error::<Test>::UnauthorizedRootUpdate
+        );
+        assert_eq!(ClaimedAmount::<Test>::get(1), 0);
+    });
+}
+
+#[test]
 fn invalid_network_or_proof_is_rejected() {
     new_test_ext().execute_with(|| {
         assert_ok!(VibClaim::set_claim_root(

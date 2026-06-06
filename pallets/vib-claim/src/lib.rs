@@ -11,8 +11,8 @@ pub mod weights;
 
 #[frame::pallet]
 pub mod pallet {
-    use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
     use crate::weights::WeightInfo;
+    use codec::{Decode, DecodeWithMemTracking, Encode, MaxEncodedLen};
     use frame::{
         prelude::*,
         traits::{
@@ -198,6 +198,78 @@ pub mod pallet {
             proof: BoundedProofOf<T>,
         ) -> DispatchResult {
             let who = ensure_signed(origin)?;
+            Self::do_claim(
+                who,
+                network_id,
+                root_version,
+                identity_id,
+                cumulative_amount,
+                proof,
+            )
+        }
+
+        #[pallet::call_index(4)]
+        #[pallet::weight(T::WeightInfo::claim_for())]
+        pub fn claim_for(
+            origin: OriginFor<T>,
+            account_id: T::AccountId,
+            network_id: BoundedNetworkIdOf<T>,
+            root_version: u32,
+            identity_id: BoundedIdentityIdOf<T>,
+            cumulative_amount: Amount,
+            proof: BoundedProofOf<T>,
+        ) -> DispatchResult {
+            let relayer = ensure_signed(origin)?;
+            ensure!(
+                ClaimRootPublisher::<T>::get().as_ref() == Some(&relayer),
+                Error::<T>::UnauthorizedRootUpdate
+            );
+            Self::do_claim(
+                account_id,
+                network_id,
+                root_version,
+                identity_id,
+                cumulative_amount,
+                proof,
+            )
+        }
+
+        #[pallet::call_index(2)]
+        #[pallet::weight(T::WeightInfo::set_claim_paused())]
+        pub fn set_claim_paused(origin: OriginFor<T>, paused: bool) -> DispatchResult {
+            T::AdminOrigin::ensure_origin(origin)
+                .map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
+            ClaimPaused::<T>::put(paused);
+            Self::deposit_event(Event::ClaimPausedUpdated { paused });
+            Ok(())
+        }
+
+        #[pallet::call_index(3)]
+        #[pallet::weight(T::WeightInfo::set_claim_root_publisher())]
+        pub fn set_claim_root_publisher(
+            origin: OriginFor<T>,
+            publisher: Option<T::AccountId>,
+        ) -> DispatchResult {
+            T::AdminOrigin::ensure_origin(origin)
+                .map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
+            match publisher.clone() {
+                Some(account) => ClaimRootPublisher::<T>::put(account),
+                None => ClaimRootPublisher::<T>::kill(),
+            }
+            Self::deposit_event(Event::ClaimRootPublisherUpdated { publisher });
+            Ok(())
+        }
+    }
+
+    impl<T: Config> Pallet<T> {
+        fn do_claim(
+            who: T::AccountId,
+            network_id: BoundedNetworkIdOf<T>,
+            root_version: u32,
+            identity_id: BoundedIdentityIdOf<T>,
+            cumulative_amount: Amount,
+            proof: BoundedProofOf<T>,
+        ) -> DispatchResult {
             ensure!(!ClaimPaused::<T>::get(), Error::<T>::ClaimPaused);
             let root = ClaimRoot::<T>::get().ok_or(Error::<T>::ClaimRootNotSet)?;
             ensure!(root.network_id == network_id, Error::<T>::InvalidNetworkId);
@@ -234,34 +306,6 @@ pub mod pallet {
             Ok(())
         }
 
-        #[pallet::call_index(2)]
-        #[pallet::weight(T::WeightInfo::set_claim_paused())]
-        pub fn set_claim_paused(origin: OriginFor<T>, paused: bool) -> DispatchResult {
-            T::AdminOrigin::ensure_origin(origin)
-                .map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
-            ClaimPaused::<T>::put(paused);
-            Self::deposit_event(Event::ClaimPausedUpdated { paused });
-            Ok(())
-        }
-
-        #[pallet::call_index(3)]
-        #[pallet::weight(T::WeightInfo::set_claim_root_publisher())]
-        pub fn set_claim_root_publisher(
-            origin: OriginFor<T>,
-            publisher: Option<T::AccountId>,
-        ) -> DispatchResult {
-            T::AdminOrigin::ensure_origin(origin)
-                .map_err(|_| Error::<T>::UnauthorizedRootUpdate)?;
-            match publisher.clone() {
-                Some(account) => ClaimRootPublisher::<T>::put(account),
-                None => ClaimRootPublisher::<T>::kill(),
-            }
-            Self::deposit_event(Event::ClaimRootPublisherUpdated { publisher });
-            Ok(())
-        }
-    }
-
-    impl<T: Config> Pallet<T> {
         fn ensure_root_update_origin(origin: OriginFor<T>) -> DispatchResult {
             match T::AdminOrigin::try_origin(origin) {
                 Ok(_) => Ok(()),
