@@ -14,6 +14,9 @@ pub enum Subcommand {
     ImportBlocks(sc_cli::ImportBlocksCmd),
     Revert(sc_cli::RevertCmd),
     PurgeChain(sc_cli::PurgeChainCmd),
+    /// Key management CLI utilities.
+    #[command(subcommand)]
+    Key(sc_cli::KeySubcommand),
 }
 
 const AFTER_HELP_EXAMPLE: &str = color_print::cstr!(

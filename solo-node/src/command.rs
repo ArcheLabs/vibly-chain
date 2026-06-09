@@ -104,6 +104,7 @@ pub fn run() -> Result<()> {
             let runner = cli.create_runner(cmd)?;
             runner.sync_run(|config| cmd.run(config.database))
         }
+        Some(Subcommand::Key(cmd)) => cmd.run(&cli),
         None => {
             let runner = cli.create_runner(&cli.run)?;
             runner.run_node_until_exit(|config| async move {

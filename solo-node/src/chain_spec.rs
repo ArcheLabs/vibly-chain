@@ -16,6 +16,13 @@ const SUDO_ACCOUNT: &str = "13HEeQf9n7wrmNCLPbxR5RSj8ZUMEn48K7sqrxUqYbY9ssVs";
 const LUMEN_FAUCET_ACCOUNT: &str = "148iJudjCvDNzD7FMpLs7o2gR4Fjpwu4MqMehT6153wH2ymi";
 const OPERATIONS_RESERVE_ACCOUNT: &str = "13VnD1QYuZvwzt6i9qSD7Tx1683GQTBsgvJ2QnQvERTXVi3H";
 
+// ── Lumen validator keys ─────────────────────────────────────────────────────
+// Generate with:
+//   ./target/release/vibly-solo-node key generate --scheme Sr25519 --output-type json
+//   ./target/release/vibly-solo-node key generate --scheme Ed25519 --output-type json
+const LUMEN_VALIDATOR_AURA: &str = "5Evq5HFVtKWsUZKYngPkxKxBBQh675XEWoJ4jJp5TLgg3ewW";
+const LUMEN_VALIDATOR_GRANDPA: &str = "5DCTRwzPAKPpEfBuKdG4S7ndTbNeLSwTxnKMgTvp8qA43AKy";
+
 const OPERATIONAL_BALANCE: runtime::Balance = 1_000_000 * runtime::UNIT;
 const LUMEN_FAUCET_BALANCE: runtime::Balance = 600_000_000 * runtime::UNIT;
 const MONOLITH_REWARD_POOL_BALANCE: runtime::Balance = 30_000_000 * runtime::UNIT;
@@ -45,6 +52,15 @@ fn grandpa_from_seed(seed: &str) -> runtime::fg_primitives::AuthorityId {
             .expect("known grandpa seed")
             .public(),
     )
+}
+
+fn aura_from_ss58(address: &str) -> runtime::AuraId {
+    runtime::AuraId::from_ss58check(address).expect("valid aura authority ss58 address")
+}
+
+fn grandpa_from_ss58(address: &str) -> runtime::fg_primitives::AuthorityId {
+    runtime::fg_primitives::AuthorityId::from_ss58check(address)
+        .expect("valid grandpa authority ss58 address")
 }
 
 fn properties() -> sc_chain_spec::Properties {
@@ -127,6 +143,29 @@ fn genesis(
     .expect("solo genesis config serializes")
 }
 
+fn genesis_with_authority_ids(
+    aura: Vec<runtime::AuraId>,
+    grandpa: Vec<runtime::fg_primitives::AuthorityId>,
+    guardians: Vec<runtime::AccountId>,
+    balances: Vec<(runtime::AccountId, runtime::Balance)>,
+    enable_rewards: bool,
+) -> serde_json::Value {
+    let sudo = account_id_from_ss58(SUDO_ACCOUNT);
+    let reward_config = enable_rewards.then(runtime::genesis_config_presets::default_reward_config);
+    let reward_settlement_publisher = enable_rewards.then_some(sudo.clone());
+
+    serde_json::to_value(runtime::genesis_config_presets::custom_config(
+        sudo,
+        aura,
+        grandpa,
+        guardians,
+        balances,
+        reward_config,
+        reward_settlement_publisher,
+    ))
+    .expect("solo genesis config serializes")
+}
+
 pub fn monolith_chain_spec() -> ChainSpec {
     let guardians = unique_accounts(
         PUBLIC_GUARDIANS
@@ -167,10 +206,10 @@ pub fn lumen_chain_spec() -> ChainSpec {
             .iter()
             .map(|address| account_id_from_ss58(address)),
     );
+    // Lumen testnet: single validator with dedicated authority keys.
+    // No Alice/Bob development accounts in the genesis balance.
     let balances = merge_balances([
         balance_from_ss58(SUDO_ACCOUNT, OPERATIONAL_BALANCE),
-        balance_from_seed("Alice", OPERATIONAL_BALANCE),
-        balance_from_seed("Bob", OPERATIONAL_BALANCE),
         balance_from_ss58(PUBLIC_GUARDIANS[0], OPERATIONAL_BALANCE),
         balance_from_ss58(PUBLIC_GUARDIANS[1], OPERATIONAL_BALANCE),
         balance_from_ss58(LUMEN_FAUCET_ACCOUNT, LUMEN_FAUCET_BALANCE),
@@ -182,7 +221,13 @@ pub fn lumen_chain_spec() -> ChainSpec {
     .with_name("Lumen")
     .with_id("vibly-lumen")
     .with_chain_type(ChainType::Live)
-    .with_genesis_config(genesis(vec!["Alice", "Bob"], guardians, balances, false))
+    .with_genesis_config(genesis_with_authority_ids(
+        vec![aura_from_ss58(LUMEN_VALIDATOR_AURA)],
+        vec![grandpa_from_ss58(LUMEN_VALIDATOR_GRANDPA)],
+        guardians,
+        balances,
+        false,
+    ))
     .with_protocol_id("vibly-lumen")
     .with_properties(properties())
     .build()
