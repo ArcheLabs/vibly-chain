@@ -219,7 +219,7 @@ pub fn lumen_chain_spec() -> ChainSpec {
         None,
     )
     .with_name("Lumen")
-    .with_id("vibly-lumen")
+    .with_id("vibly-testnet")
     .with_chain_type(ChainType::Live)
     .with_genesis_config(genesis_with_authority_ids(
         vec![aura_from_ss58(LUMEN_VALIDATOR_AURA)],
@@ -228,7 +228,7 @@ pub fn lumen_chain_spec() -> ChainSpec {
         balances,
         false,
     ))
-    .with_protocol_id("vibly-lumen")
+    .with_protocol_id("vibly-testnet")
     .with_properties(properties())
     .build()
 }
