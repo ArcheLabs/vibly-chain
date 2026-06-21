@@ -180,6 +180,16 @@ pub mod pallet {
             identity_id: IdentityId,
             evm_address: EvmAddress,
         },
+        /// An EVM address was linked to a Vibly identity.
+        EvmAddressLinked {
+            account_id: IdentityId,
+            evm_address: EvmAddress,
+        },
+        /// An EVM address was unlinked from a Vibly identity.
+        EvmAddressUnlinked {
+            account_id: IdentityId,
+            evm_address: EvmAddress,
+        },
         /// An AgentRegistrar account was authorized for an identity.
         AgentRegistrarSet {
             identity_id: IdentityId,
@@ -703,6 +713,92 @@ pub mod pallet {
                 Ok(())
             })
         }
+
+        /// Link an EVM H160 address to an existing Vibly identity.
+        ///
+        /// The caller must be the owner or recovery account. One identity can have one
+        /// EVM address and one EVM address can point to one identity. Re-linking the
+        /// same pair is idempotent. Replacing a different address requires unlink first.
+        #[pallet::call_index(15)]
+        #[pallet::weight(T::WeightInfo::link_evm_address())]
+        pub fn link_evm_address(
+            origin: OriginFor<T>,
+            identity_id: IdentityId,
+            evm_address: EvmAddress,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            if EvmAddressByIdentityId::<T>::get(identity_id) == Some(evm_address) {
+                ensure!(
+                    IdentityIdByEvmAddress::<T>::get(evm_address) == Some(identity_id),
+                    Error::<T>::EvmAddressAlreadyBound
+                );
+                return Ok(());
+            }
+            ensure!(
+                !IdentityIdByEvmAddress::<T>::contains_key(evm_address),
+                Error::<T>::EvmAddressAlreadyBound
+            );
+            ensure!(
+                !EvmAddressByIdentityId::<T>::contains_key(identity_id),
+                Error::<T>::EvmAddressAlreadyBound
+            );
+            Identities::<T>::try_mutate(identity_id, |maybe_identity| -> DispatchResult {
+                let identity = maybe_identity
+                    .as_mut()
+                    .ok_or(Error::<T>::IdentityNotFound)?;
+                Self::ensure_identity_state_for_mutation(identity, AccessScope::OwnerOrRecovery)?;
+                Self::ensure_actor(identity, &who, AccessScope::OwnerOrRecovery)?;
+                IdentityIdByEvmAddress::<T>::insert(evm_address, identity_id);
+                EvmAddressByIdentityId::<T>::insert(identity_id, evm_address);
+                Self::bump_identity(identity);
+                Self::deposit_event(Event::EvmRootBound {
+                    identity_id,
+                    evm_address,
+                });
+                Self::deposit_event(Event::EvmAddressLinked {
+                    account_id: identity_id,
+                    evm_address,
+                });
+                Ok(())
+            })
+        }
+
+        /// Unlink the current EVM H160 address from a Vibly identity.
+        ///
+        /// The caller must be the owner or recovery account. The requested address must
+        /// match the identity's current EVM binding.
+        #[pallet::call_index(16)]
+        #[pallet::weight(T::WeightInfo::unlink_evm_address())]
+        pub fn unlink_evm_address(
+            origin: OriginFor<T>,
+            identity_id: IdentityId,
+            evm_address: EvmAddress,
+        ) -> DispatchResult {
+            let who = ensure_signed(origin)?;
+            ensure!(
+                EvmAddressByIdentityId::<T>::get(identity_id) == Some(evm_address),
+                Error::<T>::EvmAddressNotBound
+            );
+            ensure!(
+                IdentityIdByEvmAddress::<T>::get(evm_address) == Some(identity_id),
+                Error::<T>::EvmAddressNotBound
+            );
+            Identities::<T>::try_mutate(identity_id, |maybe_identity| -> DispatchResult {
+                let identity = maybe_identity
+                    .as_mut()
+                    .ok_or(Error::<T>::IdentityNotFound)?;
+                Self::ensure_identity_state_for_mutation(identity, AccessScope::OwnerOrRecovery)?;
+                Self::ensure_actor(identity, &who, AccessScope::OwnerOrRecovery)?;
+                EvmAddressByIdentityId::<T>::remove(identity_id);
+                IdentityIdByEvmAddress::<T>::remove(evm_address);
+                Self::bump_identity(identity);
+                Self::deposit_event(Event::EvmAddressUnlinked {
+                    account_id: identity_id,
+                    evm_address,
+                });
+                Ok(())
+            })
+        }
     }
 
     impl<T: Config> Pallet<T> {
@@ -760,6 +856,10 @@ pub mod pallet {
             Self::deposit_event(Event::IdentityRegistered { identity_id, owner });
             Self::deposit_event(Event::EvmRootBound {
                 identity_id,
+                evm_address,
+            });
+            Self::deposit_event(Event::EvmAddressLinked {
+                account_id: identity_id,
                 evm_address,
             });
             Self::deposit_event(Event::AgentRegistrarSet {

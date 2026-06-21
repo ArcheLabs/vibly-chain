@@ -193,3 +193,71 @@ fn rotate_owner_and_revoke_key_work() {
         );
     });
 }
+
+fn evm(seed: u8) -> vibly_primitives_identity::EvmAddress {
+    [seed; 20]
+}
+
+#[test]
+fn evm_address_link_unlink_flow_works() {
+    new_test_ext().execute_with(|| {
+        assert_ok!(IdentityCore::register_identity(
+            RuntimeOrigin::signed(1),
+            Some(2),
+            None,
+            None,
+            None,
+            None
+        ));
+        let identity_id = registered_identity();
+        let address = evm(7);
+
+        assert_ok!(IdentityCore::link_evm_address(
+            RuntimeOrigin::signed(1),
+            identity_id,
+            address
+        ));
+        assert_eq!(
+            crate::IdentityIdByEvmAddress::<Test>::get(address),
+            Some(identity_id)
+        );
+        assert_eq!(
+            crate::EvmAddressByIdentityId::<Test>::get(identity_id),
+            Some(address)
+        );
+        assert!(System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::IdentityCore(crate::Event::EvmAddressLinked { account_id, evm_address })
+                if account_id == identity_id && evm_address == address
+        )));
+
+        assert_ok!(IdentityCore::link_evm_address(
+            RuntimeOrigin::signed(1),
+            identity_id,
+            address
+        ));
+        assert_noop!(
+            IdentityCore::link_evm_address(RuntimeOrigin::signed(1), identity_id, evm(8)),
+            crate::Error::<Test>::EvmAddressAlreadyBound
+        );
+        assert_noop!(
+            IdentityCore::unlink_evm_address(RuntimeOrigin::signed(3), identity_id, address),
+            crate::Error::<Test>::Unauthorized
+        );
+        assert_ok!(IdentityCore::unlink_evm_address(
+            RuntimeOrigin::signed(2),
+            identity_id,
+            address
+        ));
+        assert_eq!(crate::IdentityIdByEvmAddress::<Test>::get(address), None);
+        assert_eq!(
+            crate::EvmAddressByIdentityId::<Test>::get(identity_id),
+            None
+        );
+        assert!(System::events().iter().any(|record| matches!(
+            record.event,
+            RuntimeEvent::IdentityCore(crate::Event::EvmAddressUnlinked { account_id, evm_address })
+                if account_id == identity_id && evm_address == address
+        )));
+    });
+}

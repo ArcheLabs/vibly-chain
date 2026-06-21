@@ -16,6 +16,8 @@ pub trait WeightInfo {
     fn freeze_identity() -> Weight;
     fn unfreeze_identity() -> Weight;
     fn disable_identity() -> Weight;
+    fn link_evm_address() -> Weight;
+    fn unlink_evm_address() -> Weight;
 }
 
 impl WeightInfo for () {
@@ -62,6 +64,12 @@ impl WeightInfo for () {
         Weight::from_parts(10_000, 0)
     }
     fn disable_identity() -> Weight {
+        Weight::from_parts(10_000, 0)
+    }
+    fn link_evm_address() -> Weight {
+        Weight::from_parts(10_000, 0)
+    }
+    fn unlink_evm_address() -> Weight {
         Weight::from_parts(10_000, 0)
     }
 }
@@ -112,5 +120,11 @@ impl<T> WeightInfo for SubstrateWeight<T> {
     }
     fn disable_identity() -> Weight {
         <() as WeightInfo>::disable_identity()
+    }
+    fn link_evm_address() -> Weight {
+        <() as WeightInfo>::link_evm_address()
+    }
+    fn unlink_evm_address() -> Weight {
+        <() as WeightInfo>::unlink_evm_address()
     }
 }
